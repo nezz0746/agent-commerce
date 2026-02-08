@@ -9,15 +9,20 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowRight, ShieldCheck, Star } from "lucide-react";
 import type { SubgraphShop, SubgraphReview } from "@/lib/subgraph";
 
-function getReviewStats(reviews: Pick<SubgraphReview, "rating">[]) {
-  if (!reviews || reviews.length === 0) return null;
-  const avg = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
-  return { avg: Math.round(avg * 10) / 10, count: reviews.length };
+function getReviewStats(shop: any) {
+  // Use feedbacks from ReputationRegistry (mapped by agentId)
+  const feedbacks = shop._feedbacks as { value: string; tag1: string; clientAddress: string }[] | undefined;
+  if (!feedbacks || feedbacks.length === 0) return null;
+  const starredFeedbacks = feedbacks.filter((fb) => fb.tag1 === "starred");
+  if (starredFeedbacks.length === 0) return null;
+  const avg = starredFeedbacks.reduce((s, fb) => s + Number(fb.value), 0) / starredFeedbacks.length;
+  // value is 0-100, convert to 0-5
+  return { avg: Math.round((avg / 20) * 10) / 10, count: starredFeedbacks.length, feedbacks: starredFeedbacks };
 }
 
 function ShopCard({ shop }: { shop: SubgraphShop }) {
   const productCount = shop.products?.length ?? 0;
-  const stats = getReviewStats(shop.reviews as Pick<SubgraphReview, "rating">[]);
+  const stats = getReviewStats(shop);
   const hasAgent = shop.agentId && shop.agentId !== "0";
 
   return (
@@ -52,24 +57,24 @@ function ShopCard({ shop }: { shop: SubgraphShop }) {
               </Badge>
             )}
           </div>
-          {shop.reviews && shop.reviews.length > 0 && (
+          {stats && stats.feedbacks && stats.feedbacks.length > 0 && (
             <div className="mt-3 space-y-1.5 border-t pt-3">
               <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Recent Reviews</p>
-              {(shop.reviews as SubgraphReview[]).slice(0, 3).map((review) => (
-                <div key={review.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+              {stats.feedbacks.slice(0, 3).map((fb: any, idx: number) => (
+                <div key={idx} className="flex items-center gap-2 text-xs text-muted-foreground">
                   <span className="inline-flex items-center gap-0.5">
                     {Array.from({ length: 5 }, (_, i) => (
                       <Star
                         key={i}
                         className={`h-2.5 w-2.5 ${
-                          i < Math.round(review.rating / 20)
+                          i < Math.round(Number(fb.value) / 20)
                             ? "fill-yellow-400 text-yellow-400"
                             : "text-muted-foreground/20"
                         }`}
                       />
                     ))}
                   </span>
-                  <span className="font-mono">{shortenAddress(typeof review.customer === 'string' ? review.customer : review.customer?.address ?? '')}</span>
+                  <span className="font-mono">{shortenAddress(fb.clientAddress)}</span>
                 </div>
               ))}
             </div>

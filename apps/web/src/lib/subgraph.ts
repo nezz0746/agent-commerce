@@ -147,19 +147,33 @@ async function query<T>(gql: string, variables?: Record<string, unknown>): Promi
 // ─── Query Functions ───
 
 export async function fetchShops(): Promise<SubgraphShop[]> {
-  const data = await query<{ shops: SubgraphShop[] }>(`{
+  const data = await query<{ shops: SubgraphShop[]; feedbacks: SubgraphFeedback[] }>(`{
     shops(first: 100, orderBy: createdAt, orderDirection: desc) {
       id address owner name metadataURI paymentSplitAddress agentId createdAt
       products { id }
-      reviews(first: 3, orderBy: createdAt, orderDirection: desc) { id rating customer createdAt }
+      reviews { id rating customer { address } createdAt }
       categories { id }
       collections { id }
       orders { id }
       employees { id }
       discounts { id }
     }
+    feedbacks(first: 100, orderBy: feedbackIndex, orderDirection: desc) {
+      id value valueDecimals tag1 clientAddress
+      agent { id }
+    }
   }`);
-  return data.shops;
+  // Map feedbacks to shops by agentId
+  const shops = data.shops.map((shop) => {
+    const shopFeedbacks = data.feedbacks.filter(
+      (fb) => fb.agent?.id === shop.agentId
+    );
+    if (shopFeedbacks.length > 0) {
+      (shop as any)._feedbacks = shopFeedbacks;
+    }
+    return shop;
+  });
+  return shops;
 }
 
 export async function fetchShop(address: string): Promise<SubgraphShop | null> {
