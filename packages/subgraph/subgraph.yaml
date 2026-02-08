@@ -1,0 +1,85 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: CommerceHub
+    network: optimism
+    source:
+      address: "0x0000000000000000000000000000000000000000" # Replace after deployment
+      abi: CommerceHub
+      startBlock: 0 # Replace after deployment
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Shop
+      abis:
+        - name: CommerceHub
+          file: ../../apps/contracts/out/CommerceHub.sol/CommerceHub.json
+      eventHandlers:
+        - event: ShopCreated(indexed address,indexed address,string,string)
+          handler: handleShopCreated
+        - event: ProtocolFeeUpdated(uint256,uint256)
+          handler: handleProtocolFeeUpdated
+      file: ./src/mappings/commerceHub.ts
+templates:
+  - kind: ethereum
+    name: Shop
+    network: optimism
+    source:
+      abi: Shop
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Product
+        - Category
+        - Collection
+        - Variant
+        - Order
+        - OrderItem
+        - Employee
+        - Review
+        - Discount
+      abis:
+        - name: Shop
+          file: ../../apps/contracts/out/Shop.sol/Shop.json
+      eventHandlers:
+        - event: ProductCreated(indexed uint256,string,uint256,uint256,uint256)
+          handler: handleProductCreated
+        - event: ProductUpdated(indexed uint256,uint256,uint256,string)
+          handler: handleProductUpdated
+        - event: ProductDeactivated(indexed uint256)
+          handler: handleProductDeactivated
+        - event: CategoryCreated(indexed uint256,string)
+          handler: handleCategoryCreated
+        - event: CategoryUpdated(indexed uint256,string,string)
+          handler: handleCategoryUpdated
+        - event: CollectionCreated(indexed uint256,string,uint256[])
+          handler: handleCollectionCreated
+        - event: VariantAdded(indexed uint256,indexed uint256,string,uint256,uint256)
+          handler: handleVariantAdded
+        - event: EmployeeAdded(indexed address,bytes32)
+          handler: handleEmployeeAdded
+        - event: EmployeeRemoved(indexed address,bytes32)
+          handler: handleEmployeeRemoved
+        - event: OrderCreated(indexed uint256,indexed address,uint256)
+          handler: handleOrderCreated
+        - event: OrderFulfilled(indexed uint256)
+          handler: handleOrderFulfilled
+        - event: OrderCancelled(indexed uint256)
+          handler: handleOrderCancelled
+        - event: OrderRefunded(indexed uint256)
+          handler: handleOrderRefunded
+        - event: ReviewCreated(indexed uint256,indexed uint256,indexed address,uint8)
+          handler: handleReviewCreated
+        - event: DiscountCreated(indexed uint256,bytes32,uint256,uint256,uint256)
+          handler: handleDiscountCreated
+        - event: DiscountUsed(indexed uint256,indexed uint256)
+          handler: handleDiscountUsed
+        - event: PaymentSplitUpdated(indexed address)
+          handler: handlePaymentSplitUpdated
+      file: ./src/mappings/shop.ts
