@@ -69,7 +69,7 @@ function ShopCard({ shop }: { shop: SubgraphShop }) {
                       />
                     ))}
                   </span>
-                  <span className="font-mono">{shortenAddress(review.customer)}</span>
+                  <span className="font-mono">{shortenAddress(typeof review.customer === 'string' ? review.customer : review.customer?.address ?? '')}</span>
                 </div>
               ))}
             </div>
