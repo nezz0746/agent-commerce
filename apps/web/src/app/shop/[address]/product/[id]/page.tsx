@@ -7,11 +7,10 @@ import { shopAbi } from "@/lib/contracts";
 import { formatPrice } from "@/lib/utils";
 import { addToCart } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Check, Minus, Package, Plus, ShoppingBag, ShoppingCart } from "lucide-react";
+import { Check, Minus, Plus, ShoppingBag, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useProductMetadata } from "@/hooks/use-product-metadata";
@@ -125,7 +124,7 @@ export default function ProductPage() {
     return (
       <div className="mx-auto max-w-4xl">
         <div className="grid gap-8 md:grid-cols-2">
-          <Skeleton className="aspect-square w-full rounded-xl" />
+          <Skeleton className="aspect-square w-full" />
           <div className="space-y-4">
             <Skeleton className="h-8 w-3/4" />
             <Skeleton className="h-6 w-1/3" />
@@ -140,15 +139,12 @@ export default function ProductPage() {
 
   if (!active) {
     return (
-      <Card className="mx-auto max-w-md">
-        <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-          <Package className="h-8 w-8 text-muted-foreground" />
-          <p className="mt-2 text-muted-foreground">Product not available</p>
-          <Button variant="outline" className="mt-4" asChild>
-            <Link href={`/shop/${shopAddress}`}>Back to shop</Link>
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="mx-auto max-w-md py-16 text-center">
+        <p className="text-sm text-muted-foreground">Product not available</p>
+        <Button variant="outline" className="mt-4" asChild>
+          <Link href={`/shop/${shopAddress}`}>Back to shop</Link>
+        </Button>
+      </div>
     );
   }
 
@@ -183,17 +179,16 @@ export default function ProductPage() {
   };
 
   const stockNum = Number(displayStock);
-  const stockBadge =
+  const stockLabel =
     stockNum === 0
-      ? { label: "Out of stock", variant: "destructive" as const }
+      ? "Out of stock"
       : stockNum <= 5
-      ? { label: `Only ${stockNum} left`, variant: "secondary" as const }
-      : { label: "In stock", variant: "secondary" as const };
+      ? `Only ${stockNum} left`
+      : "In stock";
 
   return (
     <div className="mx-auto max-w-4xl">
       <div className="grid gap-8 md:grid-cols-2">
-        {/* Product Image */}
         <Card className="overflow-hidden">
           <div className="relative flex aspect-square items-center justify-center bg-muted">
             {metadata?.image ? (
@@ -206,19 +201,18 @@ export default function ProductPage() {
                 priority
               />
             ) : (
-              <ShoppingBag className="h-20 w-20 text-muted-foreground/30" />
+              <ShoppingBag className="h-16 w-16 text-muted-foreground/20" />
             )}
           </div>
         </Card>
 
-        {/* Product Details */}
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold tracking-tight">{name}</h1>
-            <p className="text-2xl font-semibold text-primary">
+        <div className="space-y-5">
+          <div className="space-y-1">
+            <h1 className="text-xl font-semibold tracking-tight">{name}</h1>
+            <p className="text-lg text-foreground">
               {formatPrice(displayPrice)}
             </p>
-            <Badge variant={stockBadge.variant}>{stockBadge.label}</Badge>
+            <p className="text-xs text-muted-foreground">{stockLabel}</p>
           </div>
 
           {metadata?.description && (

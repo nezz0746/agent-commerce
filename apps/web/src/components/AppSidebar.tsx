@@ -3,13 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-  Store,
-  ShoppingCart,
-  Package,
-  LayoutDashboard,
-  Zap,
-} from "lucide-react";
+import { Store, ShoppingCart, Package, LayoutDashboard } from "lucide-react";
 import { getCart } from "@/lib/cart";
 import {
   Sidebar,
@@ -17,7 +11,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuBadge,
@@ -28,26 +21,10 @@ import {
 import { ConnectKitButton } from "connectkit";
 
 const navItems = [
-  {
-    title: "Marketplace",
-    href: "/",
-    icon: Store,
-  },
-  {
-    title: "Cart",
-    href: "/cart",
-    icon: ShoppingCart,
-  },
-  {
-    title: "My Orders",
-    href: "/orders",
-    icon: Package,
-  },
-  {
-    title: "Admin",
-    href: "/admin",
-    icon: LayoutDashboard,
-  },
+  { title: "Marketplace", href: "/", icon: Store },
+  { title: "Cart", href: "/cart", icon: ShoppingCart },
+  { title: "Orders", href: "/orders", icon: Package },
+  { title: "Admin", href: "/admin", icon: LayoutDashboard },
 ];
 
 export function AppSidebar() {
@@ -68,15 +45,9 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Zap className="size-4" />
-                </div>
-                <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-semibold">Onchain Commerce</span>
-                  <span className="text-xs text-muted-foreground">
-                    Powered by Optimism
-                  </span>
-                </div>
+                <span className="text-base font-semibold tracking-tight">
+                  Onchain Commerce
+                </span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -84,7 +55,6 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => {

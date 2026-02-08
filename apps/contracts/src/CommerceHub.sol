@@ -52,6 +52,8 @@ contract CommerceHub is ICommerceHub, Ownable, IERC721Receiver {
     event ProtocolFeeUpdated(uint256 oldFee, uint256 newFee);
     event ProtocolFeeRecipientUpdated(address oldRecipient, address newRecipient);
     event ShopImplementationUpdated(address oldImpl, address newImpl);
+    event IdentityRegistryUpdated(address oldRegistry, address newRegistry);
+    event ReputationRegistryUpdated(address oldRegistry, address newRegistry);
 
     // ──────────────────────────────────────────────
     //  Errors
@@ -59,6 +61,7 @@ contract CommerceHub is ICommerceHub, Ownable, IERC721Receiver {
 
     error InvalidFee();
     error ZeroAddress();
+    error NotRegisteredAgent();
 
     // ──────────────────────────────────────────────
     //  Constructor
@@ -90,6 +93,16 @@ contract CommerceHub is ICommerceHub, Ownable, IERC721Receiver {
     }
 
     // ──────────────────────────────────────────────
+    //  Modifiers
+    // ──────────────────────────────────────────────
+
+    /// @notice Require the caller to be a registered agent in the ERC-8004 IdentityRegistry
+    modifier requireRegisteredAgent() {
+        if (identityRegistry.balanceOf(msg.sender) == 0) revert NotRegisteredAgent();
+        _;
+    }
+
+    // ──────────────────────────────────────────────
     //  Shop Creation
     // ──────────────────────────────────────────────
 
@@ -97,7 +110,7 @@ contract CommerceHub is ICommerceHub, Ownable, IERC721Receiver {
     /// @param name Shop name
     /// @param metadataURI URI pointing to shop metadata (IPFS or similar)
     /// @return shop Address of the newly created shop
-    function createShop(string calldata name, string calldata metadataURI) external returns (address shop) {
+    function createShop(string calldata name, string calldata metadataURI) external requireRegisteredAgent returns (address shop) {
         shop = shopImplementation.clone();
         Shop(payable(shop)).initialize(msg.sender, name, metadataURI, address(this));
 
@@ -151,6 +164,24 @@ contract CommerceHub is ICommerceHub, Ownable, IERC721Receiver {
         address old = shopImplementation;
         shopImplementation = _impl;
         emit ShopImplementationUpdated(old, _impl);
+    }
+
+    /// @notice Update the identity registry address (for multi-chain deployments)
+    /// @param _identityRegistry New IdentityRegistry address
+    function setIdentityRegistry(address _identityRegistry) external onlyOwner {
+        if (_identityRegistry == address(0)) revert ZeroAddress();
+        address old = address(identityRegistry);
+        identityRegistry = IdentityRegistry(_identityRegistry);
+        emit IdentityRegistryUpdated(old, _identityRegistry);
+    }
+
+    /// @notice Update the reputation registry address
+    /// @param _reputationRegistry New ReputationRegistry address
+    function setReputationRegistry(address _reputationRegistry) external onlyOwner {
+        if (_reputationRegistry == address(0)) revert ZeroAddress();
+        address old = address(reputationRegistry);
+        reputationRegistry = ReputationRegistry(_reputationRegistry);
+        emit ReputationRegistryUpdated(old, _reputationRegistry);
     }
 
     // ──────────────────────────────────────────────

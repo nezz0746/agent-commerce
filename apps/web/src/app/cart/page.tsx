@@ -7,8 +7,8 @@ import { shopAbi } from "@/lib/contracts";
 import { formatPrice } from "@/lib/utils";
 import { optimismSepolia } from "wagmi/chains";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle2, Loader2, ShoppingCart, Store, Trash2, Wallet } from "lucide-react";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function CartPage() {
@@ -72,32 +72,12 @@ export default function CartPage() {
 
   if (items.length === 0) {
     return (
-      <div className="mx-auto max-w-2xl">
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            {isSuccess ? (
-              <>
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500/10">
-                  <CheckCircle2 className="h-6 w-6 text-green-500" />
-                </div>
-                <h3 className="mt-4 font-semibold">Order placed!</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Your onchain order has been confirmed.
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                  <ShoppingCart className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <h3 className="mt-4 font-semibold">Your cart is empty</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Browse the marketplace to find products.
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+      <div className="mx-auto max-w-2xl py-16 text-center">
+        <p className="text-sm text-muted-foreground">
+          {isSuccess
+            ? "Order placed! Your onchain order has been confirmed."
+            : "Your cart is empty."}
+        </p>
       </div>
     );
   }
@@ -112,13 +92,8 @@ export default function CartPage() {
 
         return (
           <Card key={addr}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <Store className="h-4 w-4 text-muted-foreground" />
-                <CardTitle className="text-base">{name}</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-3 pt-5">
+              <p className="text-sm font-medium">{name}</p>
               {shopItems.map((item) => (
                 <div
                   key={`${item.productId}-${item.variantId}`}
@@ -171,20 +146,14 @@ export default function CartPage() {
                   className="w-full"
                 >
                   {isPending ? (
-                    <>
-                      <Wallet className="h-4 w-4" />
-                      Confirm in wallet...
-                    </>
+                    "Confirm in wallet..."
                   ) : isConfirming ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Confirming...
                     </>
                   ) : (
-                    <>
-                      <Wallet className="h-4 w-4" />
-                      Pay {formatPrice(shopTotal)}
-                    </>
+                    `Pay ${formatPrice(shopTotal)}`
                   )}
                 </Button>
               </CardFooter>
@@ -193,23 +162,15 @@ export default function CartPage() {
         );
       })}
 
-      {/* Total */}
-      <Card>
-        <CardContent className="flex items-center justify-between py-4">
-          <span className="font-semibold">Total</span>
-          <span className="text-lg font-bold">{formatPrice(total)}</span>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-between border-t pt-4">
+        <span className="text-sm font-medium">Total</span>
+        <span className="font-medium">{formatPrice(total)}</span>
+      </div>
 
       {!isConnected && (
-        <Card className="border-dashed">
-          <CardContent className="flex items-center gap-3 py-4">
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              Connect your wallet to checkout
-            </p>
-          </CardContent>
-        </Card>
+        <p className="text-sm text-muted-foreground">
+          Connect your wallet to checkout.
+        </p>
       )}
     </div>
   );

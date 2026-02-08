@@ -87,6 +87,7 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
         address customer;
         uint256 totalAmount;
         uint256 protocolFeeAmount;
+        uint256 escrowAmount;
         OrderStatus status;
         uint256 createdAt;
         bytes32 shippingHash;
@@ -133,6 +134,10 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
     ReputationRegistry public reputationRegistry;
     uint256 public agentId;
 
+    // Escrow
+    uint256 public escrowTimeout; // seconds; default set in initialize
+    uint256 public constant MIN_ESCROW_TIMEOUT = 1 days;
+
     // Digital delivery
     mapping(uint256 => bytes) private _deliveries;
 
@@ -161,6 +166,9 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
     event DiscountUsed(uint256 indexed discountId, uint256 indexed orderId);
     event PaymentSplitUpdated(address indexed splitAddress);
     event ShopMetadataUpdated(string metadataURI);
+    event EscrowReleased(uint256 indexed orderId, uint256 shopRevenue, uint256 protocolFee);
+    event RefundClaimed(uint256 indexed orderId, address indexed customer, uint256 amount);
+    event EscrowTimeoutUpdated(uint256 newTimeout);
 
     // ──────────────────────────────────────────────
     //  Errors
@@ -178,6 +186,8 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
     error DiscountMaxUsed();
     error TransferFailed();
     error ZeroAddress();
+    error EscrowNotExpired();
+    error InvalidTimeout();
 
     // ──────────────────────────────────────────────
     //  Initializer
@@ -196,6 +206,7 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
         _grantRole(OWNER_ROLE, owner);
         _grantRole(MANAGER_ROLE, owner);
+        _shopOwner = owner;
 
         name = _name;
         metadataURI = _metadataURI;
@@ -206,7 +217,7 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
         nextCollectionId = 1;
         nextOrderId = 1;
         nextDiscountId = 1;
-
+        escrowTimeout = 7 days;
     }
 
     /// @notice Set ERC-8004 integration (called by hub after agent registration)
@@ -381,6 +392,7 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
             customer: msg.sender,
             totalAmount: total,
             protocolFeeAmount: pFee,
+            escrowAmount: total,
             status: OrderStatus.Paid,
             createdAt: block.timestamp,
             shippingHash: bytes32(0)
@@ -393,20 +405,7 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
 
         orderCustomer[orderId] = msg.sender;
 
-        // Transfer protocol fee
-        if (pFee > 0) {
-            (bool sent,) = hub.protocolFeeRecipient().call{value: pFee}("");
-            if (!sent) revert TransferFailed();
-        }
-
-        // Transfer shop revenue
-        address recipient = paymentSplitAddress != address(0) ? paymentSplitAddress : _getOwner();
-        if (shopRevenue > 0) {
-            (bool sent,) = recipient.call{value: shopRevenue}("");
-            if (!sent) revert TransferFailed();
-        }
-
-        // Refund excess
+        // Hold funds in contract (escrow). Refund excess only.
         if (msg.value > total) {
             (bool sent,) = msg.sender.call{value: msg.value - total}("");
             if (!sent) revert TransferFailed();
@@ -420,14 +419,17 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
         }
     }
 
-    /// @notice Mark an order as fulfilled
-    function fulfillOrder(uint256 orderId) external {
+    /// @notice Mark an order as fulfilled and release escrowed funds
+    function fulfillOrder(uint256 orderId) external nonReentrant {
         if (!hasRole(MANAGER_ROLE, msg.sender) && !hasRole(EMPLOYEE_ROLE, msg.sender)) {
             revert AccessControlUnauthorizedAccount(msg.sender, EMPLOYEE_ROLE);
         }
         Order storage o = orders[orderId];
         if (o.status != OrderStatus.Paid) revert InvalidOrderStatus();
         o.status = OrderStatus.Fulfilled;
+
+        _releaseEscrow(orderId, o);
+
         emit OrderFulfilled(orderId);
     }
 
@@ -438,9 +440,11 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
         if (o.status != OrderStatus.Paid) revert InvalidOrderStatus();
 
         o.status = OrderStatus.Cancelled;
+        uint256 refund = o.escrowAmount;
+        o.escrowAmount = 0;
 
-        // Refund customer (note: protocol fee is not refunded in this simple model)
-        (bool sent,) = msg.sender.call{value: o.totalAmount - o.protocolFeeAmount}("");
+        // Full refund from escrow (including protocol fee since nothing was sent)
+        (bool sent,) = msg.sender.call{value: refund}("");
         if (!sent) revert TransferFailed();
 
         emit OrderCancelled(orderId);
@@ -452,9 +456,14 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
         if (o.status != OrderStatus.Paid && o.status != OrderStatus.Fulfilled) revert InvalidOrderStatus();
 
         o.status = OrderStatus.Refunded;
+        uint256 refund = o.escrowAmount;
+        o.escrowAmount = 0;
 
-        (bool sent,) = o.customer.call{value: o.totalAmount - o.protocolFeeAmount}("");
-        if (!sent) revert TransferFailed();
+        // Full refund from escrow
+        if (refund > 0) {
+            (bool sent,) = o.customer.call{value: refund}("");
+            if (!sent) revert TransferFailed();
+        }
 
         emit OrderRefunded(orderId);
     }
@@ -498,12 +507,17 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
     // ──────────────────────────────────────────────
 
     /// @notice Deliver digital goods for an order (manager/employee only)
-    function deliverDigital(uint256 orderId, bytes calldata payload) external {
+    function deliverDigital(uint256 orderId, bytes calldata payload) external nonReentrant {
         if (!hasRole(MANAGER_ROLE, msg.sender) && !hasRole(EMPLOYEE_ROLE, msg.sender)) {
             revert AccessControlUnauthorizedAccount(msg.sender, EMPLOYEE_ROLE);
         }
         Order storage o = orders[orderId];
         if (o.status != OrderStatus.Paid && o.status != OrderStatus.Fulfilled) revert InvalidOrderStatus();
+
+        // Release escrow if still held (status was Paid)
+        if (o.escrowAmount > 0) {
+            _releaseEscrow(orderId, o);
+        }
 
         _deliveries[orderId] = payload;
         o.status = OrderStatus.Completed;
@@ -583,13 +597,64 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
     }
 
     // ──────────────────────────────────────────────
+    //  Escrow
+    // ──────────────────────────────────────────────
+
+    /// @notice Set escrow timeout (minimum 1 day)
+    function setEscrowTimeout(uint256 _timeout) external onlyRole(OWNER_ROLE) {
+        if (_timeout < MIN_ESCROW_TIMEOUT) revert InvalidTimeout();
+        escrowTimeout = _timeout;
+        emit EscrowTimeoutUpdated(_timeout);
+    }
+
+    /// @notice Customer claims refund after escrow timeout
+    function claimRefund(uint256 orderId) external nonReentrant {
+        Order storage o = orders[orderId];
+        if (o.customer != msg.sender) revert NotOrderCustomer();
+        if (o.status != OrderStatus.Paid) revert InvalidOrderStatus();
+        if (block.timestamp < o.createdAt + escrowTimeout) revert EscrowNotExpired();
+
+        o.status = OrderStatus.Refunded;
+        uint256 refund = o.escrowAmount;
+        o.escrowAmount = 0;
+
+        (bool sent,) = msg.sender.call{value: refund}("");
+        if (!sent) revert TransferFailed();
+
+        emit RefundClaimed(orderId, msg.sender, refund);
+    }
+
+    // ──────────────────────────────────────────────
     //  Internal
     // ──────────────────────────────────────────────
 
+    /// @notice Release escrowed funds to protocol fee recipient and shop owner
+    function _releaseEscrow(uint256 orderId, Order storage o) internal {
+        uint256 escrowed = o.escrowAmount;
+        if (escrowed == 0) return;
+        o.escrowAmount = 0;
+
+        uint256 pFee = o.protocolFeeAmount;
+        uint256 shopRevenue = escrowed - pFee;
+
+        if (pFee > 0) {
+            (bool sent,) = hub.protocolFeeRecipient().call{value: pFee}("");
+            if (!sent) revert TransferFailed();
+        }
+
+        address recipient = paymentSplitAddress != address(0) ? paymentSplitAddress : _getOwner();
+        if (shopRevenue > 0) {
+            (bool sent,) = recipient.call{value: shopRevenue}("");
+            if (!sent) revert TransferFailed();
+        }
+
+        emit EscrowReleased(orderId, shopRevenue, pFee);
+    }
+
+    address private _shopOwner;
+
     function _getOwner() internal view returns (address) {
-        // Return first account with OWNER_ROLE (deployer)
-        // In practice, the owner should set a paymentSplitAddress
-        return msg.sender; // fallback
+        return _shopOwner;
     }
 
     /// @notice Allow the contract to receive ETH (for refunds)

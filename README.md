@@ -40,9 +40,18 @@ Each shop is an ERC-1167 minimal proxy clone deployed by `CommerceHub`. Shops ma
 
 **Frontend:** [`https://web-calm7uqky-adland.vercel.app`](https://web-calm7uqky-adland.vercel.app)
 
+## ERC-8004 Identity Gating
+
+Shop creation is gated behind [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) identity verification. Only addresses that hold an AgentIdentity NFT (`balanceOf > 0`) in the IdentityRegistry can call `createShop()`.
+
+- **Base Mainnet Registry:** `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`
+- The registry address is configurable via `setIdentityRegistry()` (onlyOwner) for multi-chain deployments
+- Each shop also gets registered as an agent in the registry, with the NFT transferred to the shop owner
+
 ## Key Features
 
-- **Multi-tenant shops** — Anyone can create a shop via CommerceHub
+- **Identity-gated shop creation** — Only registered ERC-8004 agents can create shops
+- **Multi-tenant shops** — Registered agents can create a shop via CommerceHub
 - **ERC-1167 clones** — Gas-efficient shop deployment using minimal proxies
 - **Role-based access** — Owner, manager, and employee roles per shop
 - **Product variants** — Products support multiple variants with independent pricing/stock

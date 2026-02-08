@@ -33,7 +33,36 @@ contract CommerceHubTest is Test {
         vm.deal(customer, 100 ether);
     }
 
+    function _createShopWithProduct(uint256 price, uint256 stock) internal returns (Shop shop, uint256 prodId) {
+        vm.prank(shopOwner);
+        identityRegistry.register("ipfs://agent");
+        vm.prank(shopOwner);
+        address shopAddr = hub.createShop("Test Shop", "ipfs://metadata");
+        shop = Shop(payable(shopAddr));
+
+        vm.startPrank(shopOwner);
+        uint256 catId = shop.createCategory("Cat", "");
+        prodId = shop.createProduct("Item", price, stock, catId, "");
+        vm.stopPrank();
+    }
+
+    function _placeOrder(Shop shop, uint256 prodId, uint256 qty, uint256 value) internal returns (uint256) {
+        Shop.OrderItem[] memory items = new Shop.OrderItem[](1);
+        items[0] = Shop.OrderItem({productId: prodId, variantId: 0, quantity: qty});
+        vm.prank(customer);
+        return shop.createOrder{value: value}(items);
+    }
+
+    function test_createShop_requiresRegisteredAgent() public {
+        vm.prank(shopOwner);
+        vm.expectRevert(CommerceHub.NotRegisteredAgent.selector);
+        hub.createShop("Test Shop", "ipfs://metadata");
+    }
+
     function test_createShop() public {
+        vm.prank(shopOwner);
+        identityRegistry.register("ipfs://agent-metadata");
+
         vm.prank(shopOwner);
         address shop = hub.createShop("Test Shop", "ipfs://metadata");
 
@@ -41,107 +70,144 @@ contract CommerceHubTest is Test {
         assertTrue(hub.isShop(shop));
         assertEq(Shop(payable(shop)).name(), "Test Shop");
 
-        // Check agent was registered
         uint256 agentId = hub.getShopAgentId(shop);
         assertGt(agentId, 0);
         assertEq(identityRegistry.ownerOf(agentId), shopOwner);
     }
 
     function test_createProductAndOrder() public {
-        vm.prank(shopOwner);
-        address shopAddr = hub.createShop("Test Shop", "ipfs://metadata");
-        Shop shop = Shop(payable(shopAddr));
+        (Shop shop, uint256 prodId) = _createShopWithProduct(1 ether, 10);
+        uint256 orderId = _placeOrder(shop, prodId, 2, 2 ether);
 
-        // Create category and product
-        vm.startPrank(shopOwner);
-        uint256 catId = shop.createCategory("Electronics", "ipfs://cat");
-        uint256 prodId = shop.createProduct("Widget", 1 ether, 10, catId, "ipfs://widget");
-        vm.stopPrank();
-
-        // Place order
-        Shop.OrderItem[] memory items = new Shop.OrderItem[](1);
-        items[0] = Shop.OrderItem({productId: prodId, variantId: 0, quantity: 2});
-
-        vm.prank(customer);
-        uint256 orderId = shop.createOrder{value: 2 ether}(items);
-
-        (address orderCustomer, uint256 total,, Shop.OrderStatus status,,) = shop.orders(orderId);
+        (address orderCustomer, uint256 total,, uint256 escrowAmt, Shop.OrderStatus status,,) = shop.orders(orderId);
         assertEq(orderCustomer, customer);
         assertEq(total, 2 ether);
+        assertEq(escrowAmt, 2 ether);
         assertTrue(status == Shop.OrderStatus.Paid);
+
+        // Funds held in contract
+        assertEq(address(shop).balance, 2 ether);
     }
 
     function test_fulfillAndFeedback() public {
-        vm.prank(shopOwner);
-        address shopAddr = hub.createShop("Test Shop", "ipfs://metadata");
-        Shop shop = Shop(payable(shopAddr));
+        (Shop shop, uint256 prodId) = _createShopWithProduct(0.5 ether, 5);
+        uint256 orderId = _placeOrder(shop, prodId, 1, 0.5 ether);
 
-        vm.startPrank(shopOwner);
-        shop.createCategory("Cat", "");
-        shop.createProduct("Item", 0.5 ether, 5, 1, "");
-        vm.stopPrank();
-
-        Shop.OrderItem[] memory items = new Shop.OrderItem[](1);
-        items[0] = Shop.OrderItem({productId: 1, variantId: 0, quantity: 1});
-
-        vm.prank(customer);
-        uint256 orderId = shop.createOrder{value: 0.5 ether}(items);
+        // Funds in escrow
+        assertEq(address(shop).balance, 0.5 ether);
 
         vm.prank(shopOwner);
         shop.fulfillOrder(orderId);
+
+        // Escrow released
+        assertEq(address(shop).balance, 0);
 
         vm.prank(customer);
         shop.leaveFeedback(orderId, 5, 0, "quality", "ipfs://review");
     }
 
     function test_digitalDelivery() public {
-        vm.prank(shopOwner);
-        address shopAddr = hub.createShop("Test Shop", "ipfs://metadata");
-        Shop shop = Shop(payable(shopAddr));
+        (Shop shop, uint256 prodId) = _createShopWithProduct(0.01 ether, 100);
+        uint256 orderId = _placeOrder(shop, prodId, 1, 0.01 ether);
 
-        vm.startPrank(shopOwner);
-        shop.createCategory("Digital", "");
-        shop.createProduct("eBook", 0.01 ether, 100, 1, "");
-        vm.stopPrank();
-
-        Shop.OrderItem[] memory items = new Shop.OrderItem[](1);
-        items[0] = Shop.OrderItem({productId: 1, variantId: 0, quantity: 1});
-
-        vm.prank(customer);
-        uint256 orderId = shop.createOrder{value: 0.01 ether}(items);
+        assertEq(address(shop).balance, 0.01 ether);
 
         bytes memory payload = abi.encodePacked("ipfs://QmDigitalContent");
 
         vm.prank(shopOwner);
         shop.deliverDigital(orderId, payload);
 
-        // Check status is Completed
-        (,,,Shop.OrderStatus status,,) = shop.orders(orderId);
-        assertTrue(status == Shop.OrderStatus.Completed);
+        // Escrow released
+        assertEq(address(shop).balance, 0);
 
-        // Check delivery payload
+        (,,,,Shop.OrderStatus status,,) = shop.orders(orderId);
+        assertTrue(status == Shop.OrderStatus.Completed);
         assertEq(shop.getDelivery(orderId), payload);
     }
 
     function test_protocolFees() public {
         uint256 balBefore = feeRecipient.balance;
 
+        (Shop shop, uint256 prodId) = _createShopWithProduct(1 ether, 10);
+        _placeOrder(shop, prodId, 1, 1 ether);
+
+        // Fee NOT yet paid — funds in escrow
+        assertEq(feeRecipient.balance - balBefore, 0);
+
+        // Fulfill releases escrow
         vm.prank(shopOwner);
-        address shopAddr = hub.createShop("Test Shop", "ipfs://metadata");
-        Shop shop = Shop(payable(shopAddr));
-
-        vm.startPrank(shopOwner);
-        shop.createCategory("Cat", "");
-        shop.createProduct("Item", 1 ether, 10, 1, "");
-        vm.stopPrank();
-
-        Shop.OrderItem[] memory items = new Shop.OrderItem[](1);
-        items[0] = Shop.OrderItem({productId: 1, variantId: 0, quantity: 1});
-
-        vm.prank(customer);
-        shop.createOrder{value: 1 ether}(items);
+        shop.fulfillOrder(1);
 
         // 2.5% of 1 ether = 0.025 ether
         assertEq(feeRecipient.balance - balBefore, 0.025 ether);
+    }
+
+    function test_cancelOrder_fullRefund() public {
+        (Shop shop, uint256 prodId) = _createShopWithProduct(1 ether, 10);
+        uint256 orderId = _placeOrder(shop, prodId, 1, 1 ether);
+
+        uint256 balBefore = customer.balance;
+        vm.prank(customer);
+        shop.cancelOrder(orderId);
+
+        // Full refund including protocol fee portion
+        assertEq(customer.balance - balBefore, 1 ether);
+        assertEq(address(shop).balance, 0);
+    }
+
+    function test_refundOrder_fullRefund() public {
+        (Shop shop, uint256 prodId) = _createShopWithProduct(1 ether, 10);
+        uint256 orderId = _placeOrder(shop, prodId, 1, 1 ether);
+
+        uint256 balBefore = customer.balance;
+        vm.prank(shopOwner);
+        shop.refundOrder(orderId);
+
+        assertEq(customer.balance - balBefore, 1 ether);
+        assertEq(address(shop).balance, 0);
+    }
+
+    function test_claimRefund_afterTimeout() public {
+        (Shop shop, uint256 prodId) = _createShopWithProduct(1 ether, 10);
+        uint256 orderId = _placeOrder(shop, prodId, 1, 1 ether);
+
+        // Too early
+        vm.prank(customer);
+        vm.expectRevert(Shop.EscrowNotExpired.selector);
+        shop.claimRefund(orderId);
+
+        // Warp past timeout (default 7 days)
+        vm.warp(block.timestamp + 7 days + 1);
+
+        uint256 balBefore = customer.balance;
+        vm.prank(customer);
+        shop.claimRefund(orderId);
+
+        assertEq(customer.balance - balBefore, 1 ether);
+        assertEq(address(shop).balance, 0);
+    }
+
+    function test_setEscrowTimeout() public {
+        (Shop shop,) = _createShopWithProduct(1 ether, 10);
+
+        // Below minimum reverts
+        vm.prank(shopOwner);
+        vm.expectRevert(Shop.InvalidTimeout.selector);
+        shop.setEscrowTimeout(1 hours);
+
+        // Valid timeout
+        vm.prank(shopOwner);
+        shop.setEscrowTimeout(3 days);
+        assertEq(shop.escrowTimeout(), 3 days);
+    }
+
+    function test_claimRefund_notCustomer() public {
+        (Shop shop, uint256 prodId) = _createShopWithProduct(1 ether, 10);
+        uint256 orderId = _placeOrder(shop, prodId, 1, 1 ether);
+        vm.warp(block.timestamp + 7 days + 1);
+
+        vm.prank(shopOwner);
+        vm.expectRevert(Shop.NotOrderCustomer.selector);
+        shop.claimRefund(orderId);
     }
 }
