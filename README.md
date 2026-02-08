@@ -31,12 +31,15 @@ Each shop is an ERC-1167 minimal proxy clone deployed by `CommerceHub`. Shops ma
 
 | Contract | Address |
 |----------|---------|
-| **CommerceHub** | `0x479bcD43394867983d7dAE0b7280c251dFa0b935` |
-| Astro Merch (shop) | `0x91674D02F80445079f1C5C576964F76ABf583379` |
-| Onchain Coffee (shop) | `0x939BCe9559157Dfe60439F0dC62c942D84f7e209` |
-| K's Workshop (shop) | `0x6591f0c9f7eb32c2014a8a90fe43f3ffda11df5a` |
+| **CommerceHub** | `0xb16e5DF039FD6Ed176fbcCF53fEcC890219EC718` |
+| **IdentityRegistry** | `0x4F553f6cbD383E1e67F593F54727DAF8940b4263` |
+| **ReputationRegistry** | `0x2b0041A16bEa71dDAaD5Da40Cc98A2926Cd00c25` |
+| **ValidationRegistry** | `0x5B8D06Fa661e9CC4DEb5aE8e4C91C6cF1509C353` |
+| **Shop Implementation** | `0x3186c203dFDEf953D9518Ebe91c544a42A3b9d21` |
+| Astro Merch (shop) | `0x99A5f9Ea2424dcB8be7406F2151be0a417ffe15B` |
+| Onchain Coffee (shop) | `0x410F81215E80EcCcB25F2B58702A98d5A87F5a0a` |
 
-**Subgraph:** [`https://api.studio.thegraph.com/query/958/onchain-commerce/v0.0.1`](https://api.studio.thegraph.com/query/958/onchain-commerce/v0.0.1)
+**Subgraph:** [`https://api.studio.thegraph.com/query/958/onchain-commerce/v0.0.2`](https://api.studio.thegraph.com/query/958/onchain-commerce/v0.0.2)
 
 **Frontend:** [`https://web-calm7uqky-adland.vercel.app`](https://web-calm7uqky-adland.vercel.app)
 

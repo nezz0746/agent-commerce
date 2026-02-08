@@ -10,6 +10,28 @@ import {
   BigInt,
 } from "@graphprotocol/graph-ts";
 
+export class IdentityRegistryUpdated extends ethereum.Event {
+  get params(): IdentityRegistryUpdated__Params {
+    return new IdentityRegistryUpdated__Params(this);
+  }
+}
+
+export class IdentityRegistryUpdated__Params {
+  _event: IdentityRegistryUpdated;
+
+  constructor(event: IdentityRegistryUpdated) {
+    this._event = event;
+  }
+
+  get oldRegistry(): Address {
+    return this._event.parameters[0].value.toAddress();
+  }
+
+  get newRegistry(): Address {
+    return this._event.parameters[1].value.toAddress();
+  }
+}
+
 export class OwnershipTransferred extends ethereum.Event {
   get params(): OwnershipTransferred__Params {
     return new OwnershipTransferred__Params(this);
@@ -76,6 +98,28 @@ export class ProtocolFeeUpdated__Params {
   }
 }
 
+export class ReputationRegistryUpdated extends ethereum.Event {
+  get params(): ReputationRegistryUpdated__Params {
+    return new ReputationRegistryUpdated__Params(this);
+  }
+}
+
+export class ReputationRegistryUpdated__Params {
+  _event: ReputationRegistryUpdated;
+
+  constructor(event: ReputationRegistryUpdated) {
+    this._event = event;
+  }
+
+  get oldRegistry(): Address {
+    return this._event.parameters[0].value.toAddress();
+  }
+
+  get newRegistry(): Address {
+    return this._event.parameters[1].value.toAddress();
+  }
+}
+
 export class ShopCreated extends ethereum.Event {
   get params(): ShopCreated__Params {
     return new ShopCreated__Params(this);
@@ -103,6 +147,10 @@ export class ShopCreated__Params {
 
   get metadataURI(): string {
     return this._event.parameters[3].value.toString();
+  }
+
+  get agentId(): BigInt {
+    return this._event.parameters[4].value.toBigInt();
   }
 }
 
@@ -159,6 +207,29 @@ export class CommerceHub extends ethereum.SmartContract {
     return ethereum.CallResult.fromValue(value[0].toAddress());
   }
 
+  getShopAgentId(shop: Address): BigInt {
+    let result = super.call(
+      "getShopAgentId",
+      "getShopAgentId(address):(uint256)",
+      [ethereum.Value.fromAddress(shop)],
+    );
+
+    return result[0].toBigInt();
+  }
+
+  try_getShopAgentId(shop: Address): ethereum.CallResult<BigInt> {
+    let result = super.tryCall(
+      "getShopAgentId",
+      "getShopAgentId(address):(uint256)",
+      [ethereum.Value.fromAddress(shop)],
+    );
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toBigInt());
+  }
+
   getShops(): Array<Address> {
     let result = super.call("getShops", "getShops():(address[])", []);
 
@@ -172,6 +243,29 @@ export class CommerceHub extends ethereum.SmartContract {
     }
     let value = result.value;
     return ethereum.CallResult.fromValue(value[0].toAddressArray());
+  }
+
+  identityRegistry(): Address {
+    let result = super.call(
+      "identityRegistry",
+      "identityRegistry():(address)",
+      [],
+    );
+
+    return result[0].toAddress();
+  }
+
+  try_identityRegistry(): ethereum.CallResult<Address> {
+    let result = super.tryCall(
+      "identityRegistry",
+      "identityRegistry():(address)",
+      [],
+    );
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toAddress());
   }
 
   isShop(param0: Address): boolean {
@@ -191,6 +285,49 @@ export class CommerceHub extends ethereum.SmartContract {
     }
     let value = result.value;
     return ethereum.CallResult.fromValue(value[0].toBoolean());
+  }
+
+  onERC721Received(
+    param0: Address,
+    param1: Address,
+    param2: BigInt,
+    param3: Bytes,
+  ): Bytes {
+    let result = super.call(
+      "onERC721Received",
+      "onERC721Received(address,address,uint256,bytes):(bytes4)",
+      [
+        ethereum.Value.fromAddress(param0),
+        ethereum.Value.fromAddress(param1),
+        ethereum.Value.fromUnsignedBigInt(param2),
+        ethereum.Value.fromBytes(param3),
+      ],
+    );
+
+    return result[0].toBytes();
+  }
+
+  try_onERC721Received(
+    param0: Address,
+    param1: Address,
+    param2: BigInt,
+    param3: Bytes,
+  ): ethereum.CallResult<Bytes> {
+    let result = super.tryCall(
+      "onERC721Received",
+      "onERC721Received(address,address,uint256,bytes):(bytes4)",
+      [
+        ethereum.Value.fromAddress(param0),
+        ethereum.Value.fromAddress(param1),
+        ethereum.Value.fromUnsignedBigInt(param2),
+        ethereum.Value.fromBytes(param3),
+      ],
+    );
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toBytes());
   }
 
   owner(): Address {
@@ -244,6 +381,73 @@ export class CommerceHub extends ethereum.SmartContract {
     }
     let value = result.value;
     return ethereum.CallResult.fromValue(value[0].toAddress());
+  }
+
+  reputationRegistry(): Address {
+    let result = super.call(
+      "reputationRegistry",
+      "reputationRegistry():(address)",
+      [],
+    );
+
+    return result[0].toAddress();
+  }
+
+  try_reputationRegistry(): ethereum.CallResult<Address> {
+    let result = super.tryCall(
+      "reputationRegistry",
+      "reputationRegistry():(address)",
+      [],
+    );
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toAddress());
+  }
+
+  reputationRegistryAddress(): Address {
+    let result = super.call(
+      "reputationRegistryAddress",
+      "reputationRegistryAddress():(address)",
+      [],
+    );
+
+    return result[0].toAddress();
+  }
+
+  try_reputationRegistryAddress(): ethereum.CallResult<Address> {
+    let result = super.tryCall(
+      "reputationRegistryAddress",
+      "reputationRegistryAddress():(address)",
+      [],
+    );
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toAddress());
+  }
+
+  shopAgentId(param0: Address): BigInt {
+    let result = super.call("shopAgentId", "shopAgentId(address):(uint256)", [
+      ethereum.Value.fromAddress(param0),
+    ]);
+
+    return result[0].toBigInt();
+  }
+
+  try_shopAgentId(param0: Address): ethereum.CallResult<BigInt> {
+    let result = super.tryCall(
+      "shopAgentId",
+      "shopAgentId(address):(uint256)",
+      [ethereum.Value.fromAddress(param0)],
+    );
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toBigInt());
   }
 
   shopCount(): BigInt {
@@ -332,6 +536,14 @@ export class ConstructorCall__Inputs {
   get _protocolFeeRecipient(): Address {
     return this._call.inputValues[2].value.toAddress();
   }
+
+  get _identityRegistry(): Address {
+    return this._call.inputValues[3].value.toAddress();
+  }
+
+  get _reputationRegistry(): Address {
+    return this._call.inputValues[4].value.toAddress();
+  }
 }
 
 export class ConstructorCall__Outputs {
@@ -406,6 +618,36 @@ export class RenounceOwnershipCall__Outputs {
   }
 }
 
+export class SetIdentityRegistryCall extends ethereum.Call {
+  get inputs(): SetIdentityRegistryCall__Inputs {
+    return new SetIdentityRegistryCall__Inputs(this);
+  }
+
+  get outputs(): SetIdentityRegistryCall__Outputs {
+    return new SetIdentityRegistryCall__Outputs(this);
+  }
+}
+
+export class SetIdentityRegistryCall__Inputs {
+  _call: SetIdentityRegistryCall;
+
+  constructor(call: SetIdentityRegistryCall) {
+    this._call = call;
+  }
+
+  get _identityRegistry(): Address {
+    return this._call.inputValues[0].value.toAddress();
+  }
+}
+
+export class SetIdentityRegistryCall__Outputs {
+  _call: SetIdentityRegistryCall;
+
+  constructor(call: SetIdentityRegistryCall) {
+    this._call = call;
+  }
+}
+
 export class SetProtocolFeeCall extends ethereum.Call {
   get inputs(): SetProtocolFeeCall__Inputs {
     return new SetProtocolFeeCall__Inputs(this);
@@ -462,6 +704,36 @@ export class SetProtocolFeeRecipientCall__Outputs {
   _call: SetProtocolFeeRecipientCall;
 
   constructor(call: SetProtocolFeeRecipientCall) {
+    this._call = call;
+  }
+}
+
+export class SetReputationRegistryCall extends ethereum.Call {
+  get inputs(): SetReputationRegistryCall__Inputs {
+    return new SetReputationRegistryCall__Inputs(this);
+  }
+
+  get outputs(): SetReputationRegistryCall__Outputs {
+    return new SetReputationRegistryCall__Outputs(this);
+  }
+}
+
+export class SetReputationRegistryCall__Inputs {
+  _call: SetReputationRegistryCall;
+
+  constructor(call: SetReputationRegistryCall) {
+    this._call = call;
+  }
+
+  get _reputationRegistry(): Address {
+    return this._call.inputValues[0].value.toAddress();
+  }
+}
+
+export class SetReputationRegistryCall__Outputs {
+  _call: SetReputationRegistryCall;
+
+  constructor(call: SetReputationRegistryCall) {
     this._call = call;
   }
 }

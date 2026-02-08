@@ -13,6 +13,7 @@ type Shop @entity {
   name: String!
   metadataURI: String!
   paymentSplitAddress: Bytes
+  agentId: BigInt
   createdAt: BigInt!
   protocol: Protocol!
   products: [Product!]! @derivedFrom(field: "shop")
@@ -123,4 +124,57 @@ type Discount @entity {
   usedCount: BigInt!
   expiresAt: BigInt!
   active: Boolean!
+}
+
+# ──────────────────────────────────────────────
+#  ERC-8004 Entities
+# ──────────────────────────────────────────────
+
+type Agent @entity {
+  id: ID!
+  agentId: BigInt!
+  owner: Bytes!
+  agentURI: String!
+  createdAt: BigInt!
+  feedbackReceived: [Feedback!]! @derivedFrom(field: "agent")
+  validationRequests: [ValidationRequest!]! @derivedFrom(field: "agent")
+}
+
+type Feedback @entity {
+  id: ID!
+  agent: Agent!
+  clientAddress: Bytes!
+  feedbackIndex: BigInt!
+  value: BigInt!
+  valueDecimals: Int!
+  tag1: String!
+  tag2: String!
+  isRevoked: Boolean!
+  createdAt: BigInt!
+  responses: [FeedbackResponse!]! @derivedFrom(field: "feedback")
+}
+
+type FeedbackResponse @entity {
+  id: ID!
+  feedback: Feedback!
+  createdAt: BigInt!
+}
+
+type ValidationRequest @entity {
+  id: ID!
+  requestHash: Bytes!
+  agent: Agent!
+  validatorAddress: Bytes!
+  requestURI: String!
+  response: Int
+  responseTag: String
+  createdAt: BigInt!
+  respondedAt: BigInt
+}
+
+type DigitalDelivery @entity {
+  id: ID!
+  order: Order!
+  shop: Shop!
+  createdAt: BigInt!
 }

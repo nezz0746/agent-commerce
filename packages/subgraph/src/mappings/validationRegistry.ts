@@ -2,7 +2,7 @@ import { BigInt } from "@graphprotocol/graph-ts";
 import {
   ValidationRequested,
   ValidationResponded,
-} from "../../generated/ValidationRegistry/ValidationRegistry";
+} from "../../generated/templates/ValidationRegistry/ValidationRegistry";
 import { ValidationRequest } from "../../generated/schema";
 
 export function handleValidationRequested(event: ValidationRequested): void {

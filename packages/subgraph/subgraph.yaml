@@ -6,9 +6,9 @@ dataSources:
     name: CommerceHub
     network: optimism-sepolia
     source:
-      address: "0x479bcD43394867983d7dAE0b7280c251dFa0b935"
+      address: "0xb16e5DF039FD6Ed176fbcCF53fEcC890219EC718"
       abi: CommerceHub
-      startBlock: 39389554
+      startBlock: 39394056
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7

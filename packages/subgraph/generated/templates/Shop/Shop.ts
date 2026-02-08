@@ -84,6 +84,28 @@ export class CollectionCreated__Params {
   }
 }
 
+export class DigitalDelivery extends ethereum.Event {
+  get params(): DigitalDelivery__Params {
+    return new DigitalDelivery__Params(this);
+  }
+}
+
+export class DigitalDelivery__Params {
+  _event: DigitalDelivery;
+
+  constructor(event: DigitalDelivery) {
+    this._event = event;
+  }
+
+  get orderId(): BigInt {
+    return this._event.parameters[0].value.toBigInt();
+  }
+
+  get payload(): Bytes {
+    return this._event.parameters[1].value.toBytes();
+  }
+}
+
 export class DiscountCreated extends ethereum.Event {
   get params(): DiscountCreated__Params {
     return new DiscountCreated__Params(this);
@@ -181,6 +203,80 @@ export class EmployeeRemoved__Params {
 
   get role(): Bytes {
     return this._event.parameters[1].value.toBytes();
+  }
+}
+
+export class EscrowReleased extends ethereum.Event {
+  get params(): EscrowReleased__Params {
+    return new EscrowReleased__Params(this);
+  }
+}
+
+export class EscrowReleased__Params {
+  _event: EscrowReleased;
+
+  constructor(event: EscrowReleased) {
+    this._event = event;
+  }
+
+  get orderId(): BigInt {
+    return this._event.parameters[0].value.toBigInt();
+  }
+
+  get shopRevenue(): BigInt {
+    return this._event.parameters[1].value.toBigInt();
+  }
+
+  get protocolFee(): BigInt {
+    return this._event.parameters[2].value.toBigInt();
+  }
+}
+
+export class EscrowTimeoutUpdated extends ethereum.Event {
+  get params(): EscrowTimeoutUpdated__Params {
+    return new EscrowTimeoutUpdated__Params(this);
+  }
+}
+
+export class EscrowTimeoutUpdated__Params {
+  _event: EscrowTimeoutUpdated;
+
+  constructor(event: EscrowTimeoutUpdated) {
+    this._event = event;
+  }
+
+  get newTimeout(): BigInt {
+    return this._event.parameters[0].value.toBigInt();
+  }
+}
+
+export class FeedbackLeft extends ethereum.Event {
+  get params(): FeedbackLeft__Params {
+    return new FeedbackLeft__Params(this);
+  }
+}
+
+export class FeedbackLeft__Params {
+  _event: FeedbackLeft;
+
+  constructor(event: FeedbackLeft) {
+    this._event = event;
+  }
+
+  get orderId(): BigInt {
+    return this._event.parameters[0].value.toBigInt();
+  }
+
+  get customer(): Address {
+    return this._event.parameters[1].value.toAddress();
+  }
+
+  get agentId(): BigInt {
+    return this._event.parameters[2].value.toBigInt();
+  }
+
+  get value(): BigInt {
+    return this._event.parameters[3].value.toBigInt();
   }
 }
 
@@ -426,33 +522,29 @@ export class ProductUpdated__Params {
   }
 }
 
-export class ReviewCreated extends ethereum.Event {
-  get params(): ReviewCreated__Params {
-    return new ReviewCreated__Params(this);
+export class RefundClaimed extends ethereum.Event {
+  get params(): RefundClaimed__Params {
+    return new RefundClaimed__Params(this);
   }
 }
 
-export class ReviewCreated__Params {
-  _event: ReviewCreated;
+export class RefundClaimed__Params {
+  _event: RefundClaimed;
 
-  constructor(event: ReviewCreated) {
+  constructor(event: RefundClaimed) {
     this._event = event;
   }
 
-  get reviewId(): BigInt {
+  get orderId(): BigInt {
     return this._event.parameters[0].value.toBigInt();
   }
 
-  get orderId(): BigInt {
-    return this._event.parameters[1].value.toBigInt();
-  }
-
   get customer(): Address {
-    return this._event.parameters[2].value.toAddress();
+    return this._event.parameters[1].value.toAddress();
   }
 
-  get rating(): i32 {
-    return this._event.parameters[3].value.toI32();
+  get amount(): BigInt {
+    return this._event.parameters[2].value.toBigInt();
   }
 }
 
@@ -754,17 +846,19 @@ export class Shop__ordersResult {
   value0: Address;
   value1: BigInt;
   value2: BigInt;
-  value3: i32;
-  value4: BigInt;
-  value5: Bytes;
+  value3: BigInt;
+  value4: i32;
+  value5: BigInt;
+  value6: Bytes;
 
   constructor(
     value0: Address,
     value1: BigInt,
     value2: BigInt,
-    value3: i32,
-    value4: BigInt,
-    value5: Bytes,
+    value3: BigInt,
+    value4: i32,
+    value5: BigInt,
+    value6: Bytes,
   ) {
     this.value0 = value0;
     this.value1 = value1;
@@ -772,6 +866,7 @@ export class Shop__ordersResult {
     this.value3 = value3;
     this.value4 = value4;
     this.value5 = value5;
+    this.value6 = value6;
   }
 
   toMap(): TypedMap<string, ethereum.Value> {
@@ -779,12 +874,13 @@ export class Shop__ordersResult {
     map.set("value0", ethereum.Value.fromAddress(this.value0));
     map.set("value1", ethereum.Value.fromUnsignedBigInt(this.value1));
     map.set("value2", ethereum.Value.fromUnsignedBigInt(this.value2));
+    map.set("value3", ethereum.Value.fromUnsignedBigInt(this.value3));
     map.set(
-      "value3",
-      ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(this.value3)),
+      "value4",
+      ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(this.value4)),
     );
-    map.set("value4", ethereum.Value.fromUnsignedBigInt(this.value4));
-    map.set("value5", ethereum.Value.fromFixedBytes(this.value5));
+    map.set("value5", ethereum.Value.fromUnsignedBigInt(this.value5));
+    map.set("value6", ethereum.Value.fromFixedBytes(this.value6));
     return map;
   }
 
@@ -800,16 +896,20 @@ export class Shop__ordersResult {
     return this.value2;
   }
 
-  getStatus(): i32 {
+  getEscrowAmount(): BigInt {
     return this.value3;
   }
 
-  getCreatedAt(): BigInt {
+  getStatus(): i32 {
     return this.value4;
   }
 
-  getShippingHash(): Bytes {
+  getCreatedAt(): BigInt {
     return this.value5;
+  }
+
+  getShippingHash(): Bytes {
+    return this.value6;
   }
 }
 
@@ -870,48 +970,6 @@ export class Shop__productsResult {
 
   getActive(): boolean {
     return this.value5;
-  }
-}
-
-export class Shop__reviewsResult {
-  value0: Address;
-  value1: BigInt;
-  value2: i32;
-  value3: string;
-
-  constructor(value0: Address, value1: BigInt, value2: i32, value3: string) {
-    this.value0 = value0;
-    this.value1 = value1;
-    this.value2 = value2;
-    this.value3 = value3;
-  }
-
-  toMap(): TypedMap<string, ethereum.Value> {
-    let map = new TypedMap<string, ethereum.Value>();
-    map.set("value0", ethereum.Value.fromAddress(this.value0));
-    map.set("value1", ethereum.Value.fromUnsignedBigInt(this.value1));
-    map.set(
-      "value2",
-      ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(this.value2)),
-    );
-    map.set("value3", ethereum.Value.fromString(this.value3));
-    return map;
-  }
-
-  getCustomer(): Address {
-    return this.value0;
-  }
-
-  getOrderId(): BigInt {
-    return this.value1;
-  }
-
-  getRating(): i32 {
-    return this.value2;
-  }
-
-  getMetadataURI(): string {
-    return this.value3;
   }
 }
 
@@ -1016,6 +1074,29 @@ export class Shop extends ethereum.SmartContract {
     return ethereum.CallResult.fromValue(value[0].toBytes());
   }
 
+  MIN_ESCROW_TIMEOUT(): BigInt {
+    let result = super.call(
+      "MIN_ESCROW_TIMEOUT",
+      "MIN_ESCROW_TIMEOUT():(uint256)",
+      [],
+    );
+
+    return result[0].toBigInt();
+  }
+
+  try_MIN_ESCROW_TIMEOUT(): ethereum.CallResult<BigInt> {
+    let result = super.tryCall(
+      "MIN_ESCROW_TIMEOUT",
+      "MIN_ESCROW_TIMEOUT():(uint256)",
+      [],
+    );
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toBigInt());
+  }
+
   OWNER_ROLE(): Bytes {
     let result = super.call("OWNER_ROLE", "OWNER_ROLE():(bytes32)", []);
 
@@ -1067,6 +1148,21 @@ export class Shop extends ethereum.SmartContract {
         ethereum.Value.fromUnsignedBigInt(_stock),
       ],
     );
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toBigInt());
+  }
+
+  agentId(): BigInt {
+    let result = super.call("agentId", "agentId():(uint256)", []);
+
+    return result[0].toBigInt();
+  }
+
+  try_agentId(): ethereum.CallResult<BigInt> {
+    let result = super.tryCall("agentId", "agentId():(uint256)", []);
     if (result.reverted) {
       return new ethereum.CallResult();
     }
@@ -1330,6 +1426,25 @@ export class Shop extends ethereum.SmartContract {
     );
   }
 
+  escrowTimeout(): BigInt {
+    let result = super.call("escrowTimeout", "escrowTimeout():(uint256)", []);
+
+    return result[0].toBigInt();
+  }
+
+  try_escrowTimeout(): ethereum.CallResult<BigInt> {
+    let result = super.tryCall(
+      "escrowTimeout",
+      "escrowTimeout():(uint256)",
+      [],
+    );
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toBigInt());
+  }
+
   getCollection(collectionId: BigInt): Shop__getCollectionResultValue0Struct {
     let result = super.call(
       "getCollection",
@@ -1357,6 +1472,25 @@ export class Shop extends ethereum.SmartContract {
     return ethereum.CallResult.fromValue(
       changetype<Shop__getCollectionResultValue0Struct>(value[0].toTuple()),
     );
+  }
+
+  getDelivery(orderId: BigInt): Bytes {
+    let result = super.call("getDelivery", "getDelivery(uint256):(bytes)", [
+      ethereum.Value.fromUnsignedBigInt(orderId),
+    ]);
+
+    return result[0].toBytes();
+  }
+
+  try_getDelivery(orderId: BigInt): ethereum.CallResult<Bytes> {
+    let result = super.tryCall("getDelivery", "getDelivery(uint256):(bytes)", [
+      ethereum.Value.fromUnsignedBigInt(orderId),
+    ]);
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toBytes());
   }
 
   getOrderItems(orderId: BigInt): Array<Shop__getOrderItemsResultValue0Struct> {
@@ -1441,41 +1575,6 @@ export class Shop extends ethereum.SmartContract {
     }
     let value = result.value;
     return ethereum.CallResult.fromValue(value[0].toAddress());
-  }
-
-  leaveReview(orderId: BigInt, rating: i32, _metadataURI: string): BigInt {
-    let result = super.call(
-      "leaveReview",
-      "leaveReview(uint256,uint8,string):(uint256)",
-      [
-        ethereum.Value.fromUnsignedBigInt(orderId),
-        ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(rating)),
-        ethereum.Value.fromString(_metadataURI),
-      ],
-    );
-
-    return result[0].toBigInt();
-  }
-
-  try_leaveReview(
-    orderId: BigInt,
-    rating: i32,
-    _metadataURI: string,
-  ): ethereum.CallResult<BigInt> {
-    let result = super.tryCall(
-      "leaveReview",
-      "leaveReview(uint256,uint8,string):(uint256)",
-      [
-        ethereum.Value.fromUnsignedBigInt(orderId),
-        ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(rating)),
-        ethereum.Value.fromString(_metadataURI),
-      ],
-    );
-    if (result.reverted) {
-      return new ethereum.CallResult();
-    }
-    let value = result.value;
-    return ethereum.CallResult.fromValue(value[0].toBigInt());
   }
 
   metadataURI(): string {
@@ -1603,21 +1702,6 @@ export class Shop extends ethereum.SmartContract {
     return ethereum.CallResult.fromValue(value[0].toBigInt());
   }
 
-  nextReviewId(): BigInt {
-    let result = super.call("nextReviewId", "nextReviewId():(uint256)", []);
-
-    return result[0].toBigInt();
-  }
-
-  try_nextReviewId(): ethereum.CallResult<BigInt> {
-    let result = super.tryCall("nextReviewId", "nextReviewId():(uint256)", []);
-    if (result.reverted) {
-      return new ethereum.CallResult();
-    }
-    let value = result.value;
-    return ethereum.CallResult.fromValue(value[0].toBigInt());
-  }
-
   nextVariantId(param0: BigInt): BigInt {
     let result = super.call(
       "nextVariantId",
@@ -1667,7 +1751,7 @@ export class Shop extends ethereum.SmartContract {
   orders(param0: BigInt): Shop__ordersResult {
     let result = super.call(
       "orders",
-      "orders(uint256):(address,uint256,uint256,uint8,uint256,bytes32)",
+      "orders(uint256):(address,uint256,uint256,uint256,uint8,uint256,bytes32)",
       [ethereum.Value.fromUnsignedBigInt(param0)],
     );
 
@@ -1675,16 +1759,17 @@ export class Shop extends ethereum.SmartContract {
       result[0].toAddress(),
       result[1].toBigInt(),
       result[2].toBigInt(),
-      result[3].toI32(),
-      result[4].toBigInt(),
-      result[5].toBytes(),
+      result[3].toBigInt(),
+      result[4].toI32(),
+      result[5].toBigInt(),
+      result[6].toBytes(),
     );
   }
 
   try_orders(param0: BigInt): ethereum.CallResult<Shop__ordersResult> {
     let result = super.tryCall(
       "orders",
-      "orders(uint256):(address,uint256,uint256,uint8,uint256,bytes32)",
+      "orders(uint256):(address,uint256,uint256,uint256,uint8,uint256,bytes32)",
       [ethereum.Value.fromUnsignedBigInt(param0)],
     );
     if (result.reverted) {
@@ -1696,9 +1781,10 @@ export class Shop extends ethereum.SmartContract {
         value[0].toAddress(),
         value[1].toBigInt(),
         value[2].toBigInt(),
-        value[3].toI32(),
-        value[4].toBigInt(),
-        value[5].toBytes(),
+        value[3].toBigInt(),
+        value[4].toI32(),
+        value[5].toBigInt(),
+        value[6].toBytes(),
       ),
     );
   }
@@ -1780,39 +1866,27 @@ export class Shop extends ethereum.SmartContract {
     );
   }
 
-  reviews(param0: BigInt): Shop__reviewsResult {
+  reputationRegistry(): Address {
     let result = super.call(
-      "reviews",
-      "reviews(uint256):(address,uint256,uint8,string)",
-      [ethereum.Value.fromUnsignedBigInt(param0)],
+      "reputationRegistry",
+      "reputationRegistry():(address)",
+      [],
     );
 
-    return new Shop__reviewsResult(
-      result[0].toAddress(),
-      result[1].toBigInt(),
-      result[2].toI32(),
-      result[3].toString(),
-    );
+    return result[0].toAddress();
   }
 
-  try_reviews(param0: BigInt): ethereum.CallResult<Shop__reviewsResult> {
+  try_reputationRegistry(): ethereum.CallResult<Address> {
     let result = super.tryCall(
-      "reviews",
-      "reviews(uint256):(address,uint256,uint8,string)",
-      [ethereum.Value.fromUnsignedBigInt(param0)],
+      "reputationRegistry",
+      "reputationRegistry():(address)",
+      [],
     );
     if (result.reverted) {
       return new ethereum.CallResult();
     }
     let value = result.value;
-    return ethereum.CallResult.fromValue(
-      new Shop__reviewsResult(
-        value[0].toAddress(),
-        value[1].toBigInt(),
-        value[2].toI32(),
-        value[3].toString(),
-      ),
-    );
+    return ethereum.CallResult.fromValue(value[0].toAddress());
   }
 
   supportsInterface(interfaceId: Bytes): boolean {
@@ -1989,6 +2063,36 @@ export class CancelOrderCall__Outputs {
   _call: CancelOrderCall;
 
   constructor(call: CancelOrderCall) {
+    this._call = call;
+  }
+}
+
+export class ClaimRefundCall extends ethereum.Call {
+  get inputs(): ClaimRefundCall__Inputs {
+    return new ClaimRefundCall__Inputs(this);
+  }
+
+  get outputs(): ClaimRefundCall__Outputs {
+    return new ClaimRefundCall__Outputs(this);
+  }
+}
+
+export class ClaimRefundCall__Inputs {
+  _call: ClaimRefundCall;
+
+  constructor(call: ClaimRefundCall) {
+    this._call = call;
+  }
+
+  get orderId(): BigInt {
+    return this._call.inputValues[0].value.toBigInt();
+  }
+}
+
+export class ClaimRefundCall__Outputs {
+  _call: ClaimRefundCall;
+
+  constructor(call: ClaimRefundCall) {
     this._call = call;
   }
 }
@@ -2299,6 +2403,40 @@ export class DeactivateProductCall__Outputs {
   }
 }
 
+export class DeliverDigitalCall extends ethereum.Call {
+  get inputs(): DeliverDigitalCall__Inputs {
+    return new DeliverDigitalCall__Inputs(this);
+  }
+
+  get outputs(): DeliverDigitalCall__Outputs {
+    return new DeliverDigitalCall__Outputs(this);
+  }
+}
+
+export class DeliverDigitalCall__Inputs {
+  _call: DeliverDigitalCall;
+
+  constructor(call: DeliverDigitalCall) {
+    this._call = call;
+  }
+
+  get orderId(): BigInt {
+    return this._call.inputValues[0].value.toBigInt();
+  }
+
+  get payload(): Bytes {
+    return this._call.inputValues[1].value.toBytes();
+  }
+}
+
+export class DeliverDigitalCall__Outputs {
+  _call: DeliverDigitalCall;
+
+  constructor(call: DeliverDigitalCall) {
+    this._call = call;
+  }
+}
+
 export class FulfillOrderCall extends ethereum.Call {
   get inputs(): FulfillOrderCall__Inputs {
     return new FulfillOrderCall__Inputs(this);
@@ -2405,20 +2543,20 @@ export class InitializeCall__Outputs {
   }
 }
 
-export class LeaveReviewCall extends ethereum.Call {
-  get inputs(): LeaveReviewCall__Inputs {
-    return new LeaveReviewCall__Inputs(this);
+export class LeaveFeedbackCall extends ethereum.Call {
+  get inputs(): LeaveFeedbackCall__Inputs {
+    return new LeaveFeedbackCall__Inputs(this);
   }
 
-  get outputs(): LeaveReviewCall__Outputs {
-    return new LeaveReviewCall__Outputs(this);
+  get outputs(): LeaveFeedbackCall__Outputs {
+    return new LeaveFeedbackCall__Outputs(this);
   }
 }
 
-export class LeaveReviewCall__Inputs {
-  _call: LeaveReviewCall;
+export class LeaveFeedbackCall__Inputs {
+  _call: LeaveFeedbackCall;
 
-  constructor(call: LeaveReviewCall) {
+  constructor(call: LeaveFeedbackCall) {
     this._call = call;
   }
 
@@ -2426,24 +2564,28 @@ export class LeaveReviewCall__Inputs {
     return this._call.inputValues[0].value.toBigInt();
   }
 
-  get rating(): i32 {
-    return this._call.inputValues[1].value.toI32();
+  get value(): BigInt {
+    return this._call.inputValues[1].value.toBigInt();
   }
 
-  get _metadataURI(): string {
-    return this._call.inputValues[2].value.toString();
+  get valueDecimals(): i32 {
+    return this._call.inputValues[2].value.toI32();
+  }
+
+  get tag1(): string {
+    return this._call.inputValues[3].value.toString();
+  }
+
+  get feedbackURI(): string {
+    return this._call.inputValues[4].value.toString();
   }
 }
 
-export class LeaveReviewCall__Outputs {
-  _call: LeaveReviewCall;
+export class LeaveFeedbackCall__Outputs {
+  _call: LeaveFeedbackCall;
 
-  constructor(call: LeaveReviewCall) {
+  constructor(call: LeaveFeedbackCall) {
     this._call = call;
-  }
-
-  get reviewId(): BigInt {
-    return this._call.outputValues[0].value.toBigInt();
   }
 }
 
@@ -2635,6 +2777,70 @@ export class RevokeRoleCall__Outputs {
   _call: RevokeRoleCall;
 
   constructor(call: RevokeRoleCall) {
+    this._call = call;
+  }
+}
+
+export class SetERC8004Call extends ethereum.Call {
+  get inputs(): SetERC8004Call__Inputs {
+    return new SetERC8004Call__Inputs(this);
+  }
+
+  get outputs(): SetERC8004Call__Outputs {
+    return new SetERC8004Call__Outputs(this);
+  }
+}
+
+export class SetERC8004Call__Inputs {
+  _call: SetERC8004Call;
+
+  constructor(call: SetERC8004Call) {
+    this._call = call;
+  }
+
+  get _reputationRegistry(): Address {
+    return this._call.inputValues[0].value.toAddress();
+  }
+
+  get _agentId(): BigInt {
+    return this._call.inputValues[1].value.toBigInt();
+  }
+}
+
+export class SetERC8004Call__Outputs {
+  _call: SetERC8004Call;
+
+  constructor(call: SetERC8004Call) {
+    this._call = call;
+  }
+}
+
+export class SetEscrowTimeoutCall extends ethereum.Call {
+  get inputs(): SetEscrowTimeoutCall__Inputs {
+    return new SetEscrowTimeoutCall__Inputs(this);
+  }
+
+  get outputs(): SetEscrowTimeoutCall__Outputs {
+    return new SetEscrowTimeoutCall__Outputs(this);
+  }
+}
+
+export class SetEscrowTimeoutCall__Inputs {
+  _call: SetEscrowTimeoutCall;
+
+  constructor(call: SetEscrowTimeoutCall) {
+    this._call = call;
+  }
+
+  get _timeout(): BigInt {
+    return this._call.inputValues[0].value.toBigInt();
+  }
+}
+
+export class SetEscrowTimeoutCall__Outputs {
+  _call: SetEscrowTimeoutCall;
+
+  constructor(call: SetEscrowTimeoutCall) {
     this._call = call;
   }
 }
