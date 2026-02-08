@@ -19,7 +19,7 @@ dataSources:
         - name: CommerceHub
           file: ../../apps/contracts/out/CommerceHub.sol/CommerceHub.json
       eventHandlers:
-        - event: ShopCreated(indexed address,indexed address,string,string)
+        - event: ShopCreated(indexed address,indexed address,string,string,uint256)
           handler: handleShopCreated
         - event: ProtocolFeeUpdated(uint256,uint256)
           handler: handleProtocolFeeUpdated
@@ -74,8 +74,10 @@ templates:
           handler: handleOrderCancelled
         - event: OrderRefunded(indexed uint256)
           handler: handleOrderRefunded
-        - event: ReviewCreated(indexed uint256,indexed uint256,indexed address,uint8)
-          handler: handleReviewCreated
+        - event: FeedbackLeft(indexed uint256,indexed address,indexed uint256,int128)
+          handler: handleFeedbackLeft
+        - event: DigitalDelivery(indexed uint256,bytes)
+          handler: handleDigitalDelivery
         - event: DiscountCreated(indexed uint256,bytes32,uint256,uint256,uint256)
           handler: handleDiscountCreated
         - event: DiscountUsed(indexed uint256,indexed uint256)
@@ -83,3 +85,66 @@ templates:
         - event: PaymentSplitUpdated(indexed address)
           handler: handlePaymentSplitUpdated
       file: ./src/mappings/shop.ts
+  - kind: ethereum
+    name: IdentityRegistry
+    network: optimism-sepolia
+    source:
+      abi: IdentityRegistry
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Agent
+      abis:
+        - name: IdentityRegistry
+          file: ../../apps/contracts/out/IdentityRegistry.sol/IdentityRegistry.json
+      eventHandlers:
+        - event: Registered(indexed uint256,indexed address,string)
+          handler: handleRegistered
+        - event: URIUpdated(indexed uint256,string)
+          handler: handleURIUpdated
+      file: ./src/mappings/identityRegistry.ts
+  - kind: ethereum
+    name: ReputationRegistry
+    network: optimism-sepolia
+    source:
+      abi: ReputationRegistry
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Feedback
+        - FeedbackResponse
+      abis:
+        - name: ReputationRegistry
+          file: ../../apps/contracts/out/ReputationRegistry.sol/ReputationRegistry.json
+      eventHandlers:
+        - event: NewFeedback(indexed uint256,indexed address,uint64,int128,uint8,string,string)
+          handler: handleNewFeedback
+        - event: FeedbackRevoked(indexed uint256,indexed address,uint64)
+          handler: handleFeedbackRevoked
+        - event: ResponseAppended(indexed uint256,indexed address,uint64)
+          handler: handleResponseAppended
+      file: ./src/mappings/reputationRegistry.ts
+  - kind: ethereum
+    name: ValidationRegistry
+    network: optimism-sepolia
+    source:
+      abi: ValidationRegistry
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - ValidationRequest
+      abis:
+        - name: ValidationRegistry
+          file: ../../apps/contracts/out/ValidationRegistry.sol/ValidationRegistry.json
+      eventHandlers:
+        - event: ValidationRequested(indexed bytes32,indexed uint256,indexed address,string)
+          handler: handleValidationRequested
+        - event: ValidationResponded(indexed bytes32,uint8,string)
+          handler: handleValidationResponded
+      file: ./src/mappings/validationRegistry.ts

@@ -27,7 +27,10 @@ function ProductCard({
     args: [BigInt(productId)],
   });
 
-  if (!data) {
+  const parsed = data as [string, bigint, bigint, bigint, string, boolean] | undefined;
+  const metadata = useProductMetadata(parsed?.[4] || undefined);
+
+  if (!parsed) {
     return (
       <Card>
         <CardContent className="p-4">
@@ -39,15 +42,7 @@ function ProductCard({
     );
   }
 
-  const [name, price, stock, , metadataURI, active] = data as [
-    string,
-    bigint,
-    bigint,
-    bigint,
-    string,
-    boolean
-  ];
-  const metadata = useProductMetadata(metadataURI || undefined);
+  const [name, price, stock, , , active] = parsed;
   if (!active) return null;
 
   const stockLabel =

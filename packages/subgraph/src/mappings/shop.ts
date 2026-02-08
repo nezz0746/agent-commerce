@@ -13,7 +13,8 @@ import {
   OrderFulfilled,
   OrderCancelled,
   OrderRefunded,
-  ReviewCreated,
+  FeedbackLeft,
+  DigitalDelivery as DigitalDeliveryEvent,
   DiscountCreated,
   DiscountUsed,
   PaymentSplitUpdated,
@@ -26,9 +27,9 @@ import {
   Order,
   Customer,
   Employee,
-  Review,
   Discount,
   Shop,
+  DigitalDelivery,
 } from "../../generated/schema";
 
 function shopId(event: ethereum.Event): string {
@@ -197,18 +198,26 @@ export function handleOrderRefunded(event: OrderRefunded): void {
   }
 }
 
-export function handleReviewCreated(event: ReviewCreated): void {
+export function handleFeedbackLeft(event: FeedbackLeft): void {
+  // Feedback is tracked primarily in the ReputationRegistry data source
+  // This handler is for linking feedback events to shop orders
+}
+
+export function handleDigitalDelivery(event: DigitalDeliveryEvent): void {
   let sid = shopId(event);
-  let id = entityId(sid, "review", event.params.reviewId);
-  let review = new Review(id);
-  review.reviewId = event.params.reviewId;
-  review.shop = sid;
-  review.order = entityId(sid, "order", event.params.orderId);
-  review.customer = event.params.customer.toHexString();
-  review.rating = event.params.rating;
-  review.metadataURI = "";
-  review.createdAt = event.block.timestamp;
-  review.save();
+  let id = entityId(sid, "delivery", event.params.orderId);
+  let delivery = new DigitalDelivery(id);
+  delivery.order = entityId(sid, "order", event.params.orderId);
+  delivery.shop = sid;
+  delivery.createdAt = event.block.timestamp;
+  delivery.save();
+
+  // Update order status to Completed
+  let order = Order.load(entityId(sid, "order", event.params.orderId));
+  if (order != null) {
+    order.status = "Completed";
+    order.save();
+  }
 }
 
 export function handleDiscountCreated(event: DiscountCreated): void {

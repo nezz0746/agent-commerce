@@ -556,7 +556,9 @@ function SettingsTab({ shopAddress }: { shopAddress: `0x${string}` }) {
         <div>
           <Label>Payment Split Address</Label>
           <p className="mt-1 text-xs text-muted-foreground">
-            {(splitAddr as string) === "0x0000000000000000000000000000000000000000"
+            {!splitAddr
+              ? "Loading..."
+              : (splitAddr as string) === "0x0000000000000000000000000000000000000000"
               ? "Not set (defaults to owner)"
               : shortenAddress(splitAddr as string)}
           </p>

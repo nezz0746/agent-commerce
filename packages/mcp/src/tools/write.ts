@@ -140,15 +140,17 @@ export function registerWriteTools(server: McpServer) {
   );
 
   server.tool(
-    "leave_review",
-    "Leave a review for a fulfilled order (rating 1-5)",
+    "leave_feedback",
+    "Leave feedback for a fulfilled order via ERC-8004 Reputation Registry",
     {
       shopAddress: z.string().describe("Shop contract address"),
-      orderId: z.string().describe("Order ID to review"),
-      rating: z.number().int().min(1).max(5).describe("Rating from 1 to 5"),
-      text: z.string().describe("Review text (stored as metadataURI)"),
+      orderId: z.string().describe("Order ID to leave feedback for"),
+      value: z.number().int().describe("Feedback value (e.g. 1-5)"),
+      valueDecimals: z.number().int().default(0).describe("Decimal places for value"),
+      tag1: z.string().default("quality").describe("Feedback category (quality, delivery, accuracy)"),
+      feedbackURI: z.string().default("").describe("URI to detailed feedback"),
     },
-    async ({ shopAddress, orderId, rating, text }) => {
+    async ({ shopAddress, orderId, value, valueDecimals, tag1, feedbackURI }) => {
       const walletClient = getWalletClient();
       const publicClient = getPublicClient();
       const account = getAccount();
@@ -156,29 +158,13 @@ export function registerWriteTools(server: McpServer) {
       const hash = await walletClient.writeContract({
         address: shopAddress as `0x${string}`,
         abi: shopAbi,
-        functionName: "leaveReview",
-        args: [BigInt(orderId), rating, text],
+        functionName: "leaveFeedback",
+        args: [BigInt(orderId), BigInt(value), valueDecimals, tag1, feedbackURI],
         account,
         chain: walletClient.chain,
       });
 
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
-
-      let reviewId: string | undefined;
-      for (const log of receipt.logs) {
-        try {
-          const event = decodeEventLog({
-            abi: shopAbi,
-            data: log.data,
-            topics: log.topics,
-          });
-          if (event.eventName === "ReviewCreated") {
-            reviewId = (event.args as { reviewId: bigint }).reviewId.toString();
-          }
-        } catch {
-          // not our event
-        }
-      }
 
       return {
         content: [
@@ -187,7 +173,7 @@ export function registerWriteTools(server: McpServer) {
             text: JSON.stringify({
               success: true,
               txHash: hash,
-              reviewId,
+              orderId,
               blockNumber: receipt.blockNumber.toString(),
             }, null, 2),
           },

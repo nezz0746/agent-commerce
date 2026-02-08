@@ -5,6 +5,7 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {ICommerceHub} from "./interfaces/ICommerceHub.sol";
+import {ReputationRegistry} from "./erc8004/ReputationRegistry.sol";
 
 /// @title Shop
 /// @author onchain-commerce
@@ -91,13 +92,6 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
         bytes32 shippingHash;
     }
 
-    struct Review {
-        address customer;
-        uint256 orderId;
-        uint8 rating;
-        string metadataURI;
-    }
-
     struct Discount {
         bytes32 code;
         uint256 basisPoints;
@@ -129,13 +123,18 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
     mapping(uint256 => Collection) private _collections;
     mapping(uint256 => Order) public orders;
     mapping(uint256 => OrderItem[]) private _orderItems;
-    mapping(uint256 => Review) public reviews;
-    uint256 public nextReviewId;
     mapping(uint256 => Discount) public discounts;
     mapping(bytes32 => uint256) public discountCodeToId;
 
     // Track customer orders for review verification
     mapping(uint256 => address) public orderCustomer;
+
+    // ERC-8004 Reputation
+    ReputationRegistry public reputationRegistry;
+    uint256 public agentId;
+
+    // Digital delivery
+    mapping(uint256 => bytes) private _deliveries;
 
     // ──────────────────────────────────────────────
     //  Events
@@ -156,7 +155,8 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
     event OrderCancelled(uint256 indexed orderId);
     event OrderRefunded(uint256 indexed orderId);
     event ShippingUpdated(uint256 indexed orderId, bytes32 shippingHash);
-    event ReviewCreated(uint256 indexed reviewId, uint256 indexed orderId, address indexed customer, uint8 rating);
+    event FeedbackLeft(uint256 indexed orderId, address indexed customer, uint256 indexed agentId, int128 value);
+    event DigitalDelivery(uint256 indexed orderId, bytes payload);
     event DiscountCreated(uint256 indexed discountId, bytes32 code, uint256 basisPoints, uint256 maxUses, uint256 expiresAt);
     event DiscountUsed(uint256 indexed discountId, uint256 indexed orderId);
     event PaymentSplitUpdated(address indexed splitAddress);
@@ -172,9 +172,7 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
     error InsufficientPayment();
     error InvalidOrderStatus();
     error NotOrderCustomer();
-    error InvalidRating();
     error OrderNotFulfilled();
-    error AlreadyReviewed();
     error InvalidDiscount();
     error DiscountExpired();
     error DiscountMaxUsed();
@@ -208,7 +206,15 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
         nextCollectionId = 1;
         nextOrderId = 1;
         nextDiscountId = 1;
-        nextReviewId = 1;
+
+    }
+
+    /// @notice Set ERC-8004 integration (called by hub after agent registration)
+    function setERC8004(address _reputationRegistry, uint256 _agentId) external {
+        require(msg.sender == address(hub), "Only hub");
+        require(address(reputationRegistry) == address(0), "Already set");
+        reputationRegistry = ReputationRegistry(_reputationRegistry);
+        agentId = _agentId;
     }
 
     // ──────────────────────────────────────────────
@@ -468,19 +474,45 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
     }
 
     // ──────────────────────────────────────────────
-    //  Reviews
+    //  Feedback (ERC-8004 Reputation)
     // ──────────────────────────────────────────────
 
-    /// @notice Leave a review for a fulfilled order (verified purchase only)
-    function leaveReview(uint256 orderId, uint8 rating, string calldata _metadataURI) external returns (uint256 reviewId) {
+    /// @notice Leave feedback for a fulfilled order via the ERC-8004 Reputation Registry
+    function leaveFeedback(
+        uint256 orderId,
+        int128 value,
+        uint8 valueDecimals,
+        string calldata tag1,
+        string calldata feedbackURI
+    ) external {
         if (orderCustomer[orderId] != msg.sender) revert NotOrderCustomer();
         Order storage o = orders[orderId];
         if (o.status != OrderStatus.Fulfilled && o.status != OrderStatus.Completed) revert OrderNotFulfilled();
-        if (rating == 0 || rating > 5) revert InvalidRating();
 
-        reviewId = nextReviewId++;
-        reviews[reviewId] = Review({customer: msg.sender, orderId: orderId, rating: rating, metadataURI: _metadataURI});
-        emit ReviewCreated(reviewId, orderId, msg.sender, rating);
+        reputationRegistry.giveFeedback(agentId, value, valueDecimals, tag1, "", "", feedbackURI, bytes32(0));
+        emit FeedbackLeft(orderId, msg.sender, agentId, value);
+    }
+
+    // ──────────────────────────────────────────────
+    //  Digital Delivery
+    // ──────────────────────────────────────────────
+
+    /// @notice Deliver digital goods for an order (manager/employee only)
+    function deliverDigital(uint256 orderId, bytes calldata payload) external {
+        if (!hasRole(MANAGER_ROLE, msg.sender) && !hasRole(EMPLOYEE_ROLE, msg.sender)) {
+            revert AccessControlUnauthorizedAccount(msg.sender, EMPLOYEE_ROLE);
+        }
+        Order storage o = orders[orderId];
+        if (o.status != OrderStatus.Paid && o.status != OrderStatus.Fulfilled) revert InvalidOrderStatus();
+
+        _deliveries[orderId] = payload;
+        o.status = OrderStatus.Completed;
+        emit DigitalDelivery(orderId, payload);
+    }
+
+    /// @notice Get the digital delivery payload for an order
+    function getDelivery(uint256 orderId) external view returns (bytes memory) {
+        return _deliveries[orderId];
     }
 
     // ──────────────────────────────────────────────

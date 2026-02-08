@@ -178,4 +178,52 @@ export const shopAbi = [
     ],
     anonymous: false,
   },
+  {
+    type: "function",
+    name: "deliverDigital",
+    inputs: [
+      { name: "orderId", type: "uint256" },
+      { name: "payload", type: "bytes" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "getDelivery",
+    inputs: [{ name: "orderId", type: "uint256" }],
+    outputs: [{ name: "", type: "bytes" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "leaveFeedback",
+    inputs: [
+      { name: "orderId", type: "uint256" },
+      { name: "value", type: "int128" },
+      { name: "valueDecimals", type: "uint8" },
+      { name: "tag1", type: "string" },
+      { name: "feedbackURI", type: "string" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "event",
+    name: "DigitalDelivery",
+    inputs: [
+      { name: "orderId", type: "uint256", indexed: true },
+      { name: "payload", type: "bytes", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "FeedbackLeft",
+    inputs: [
+      { name: "orderId", type: "uint256", indexed: true },
+      { name: "customer", type: "address", indexed: true },
+      { name: "agentId", type: "uint256", indexed: true },
+      { name: "value", type: "int128", indexed: false },
+    ],
+  },
 ] as const;

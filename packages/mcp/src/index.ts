@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { registerReadTools } from "./tools/read.js";
 import { registerWriteTools } from "./tools/write.js";
 import { registerAdminTools } from "./tools/admin.js";
+import { registerERC8004Tools } from "./tools/erc8004.js";
 
 const server = new McpServer({
   name: "onchain-commerce",
@@ -13,6 +14,7 @@ const server = new McpServer({
 registerReadTools(server);
 registerWriteTools(server);
 registerAdminTools(server);
+registerERC8004Tools(server);
 
 // Start the server with stdio transport
 const transport = new StdioServerTransport();

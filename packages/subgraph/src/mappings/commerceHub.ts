@@ -26,6 +26,7 @@ export function handleShopCreated(event: ShopCreated): void {
   shop.owner = event.params.owner;
   shop.name = event.params.name;
   shop.metadataURI = event.params.metadataURI;
+  shop.agentId = event.params.agentId;
   shop.createdAt = event.block.timestamp;
   shop.protocol = PROTOCOL_ID;
   shop.save();

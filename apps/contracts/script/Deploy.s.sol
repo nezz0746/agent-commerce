@@ -4,9 +4,12 @@ pragma solidity ^0.8.24;
 import {Script, console2} from "forge-std/Script.sol";
 import {Shop} from "../src/Shop.sol";
 import {CommerceHub} from "../src/CommerceHub.sol";
+import {IdentityRegistry} from "../src/erc8004/IdentityRegistry.sol";
+import {ReputationRegistry} from "../src/erc8004/ReputationRegistry.sol";
+import {ValidationRegistry} from "../src/erc8004/ValidationRegistry.sol";
 
 /// @title Deploy
-/// @notice Deployment script for the onchain-commerce protocol on Optimism
+/// @notice Deployment script for the onchain-commerce protocol with ERC-8004 integration
 contract Deploy is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -15,12 +18,26 @@ contract Deploy is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // 1. Deploy Shop implementation
+        // 1. Deploy ERC-8004 registries
+        IdentityRegistry identityRegistry = new IdentityRegistry();
+        console2.log("IdentityRegistry:", address(identityRegistry));
+
+        ReputationRegistry reputationRegistry = new ReputationRegistry();
+        reputationRegistry.initialize(address(identityRegistry));
+        console2.log("ReputationRegistry:", address(reputationRegistry));
+
+        ValidationRegistry validationRegistry = new ValidationRegistry();
+        validationRegistry.initialize(address(identityRegistry));
+        console2.log("ValidationRegistry:", address(validationRegistry));
+
+        // 2. Deploy Shop implementation
         Shop shopImpl = new Shop();
         console2.log("Shop implementation:", address(shopImpl));
 
-        // 2. Deploy CommerceHub
-        CommerceHub hub = new CommerceHub(address(shopImpl), protocolFee, feeRecipient);
+        // 3. Deploy CommerceHub with ERC-8004 registries
+        CommerceHub hub = new CommerceHub(
+            address(shopImpl), protocolFee, feeRecipient, address(identityRegistry), address(reputationRegistry)
+        );
         console2.log("CommerceHub:", address(hub));
 
         vm.stopBroadcast();

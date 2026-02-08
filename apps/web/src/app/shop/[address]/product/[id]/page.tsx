@@ -118,7 +118,10 @@ export default function ProductPage() {
     query: { enabled: selectedVariant > 0 },
   });
 
-  if (!product) {
+  const parsed = product as [string, bigint, bigint, bigint, string, boolean] | undefined;
+  const metadata = useProductMetadata(parsed?.[4] || undefined);
+
+  if (!parsed) {
     return (
       <div className="mx-auto max-w-4xl">
         <div className="grid gap-8 md:grid-cols-2">
@@ -133,15 +136,7 @@ export default function ProductPage() {
     );
   }
 
-  const [name, price, stock, , metadataURI, active] = product as [
-    string,
-    bigint,
-    bigint,
-    bigint,
-    string,
-    boolean
-  ];
-  const metadata = useProductMetadata(metadataURI || undefined);
+  const [name, price, stock, , , active] = parsed;
 
   if (!active) {
     return (

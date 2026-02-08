@@ -3,14 +3,17 @@ pragma solidity ^0.8.24;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {Shop} from "./Shop.sol";
 import {ICommerceHub} from "./interfaces/ICommerceHub.sol";
+import {IdentityRegistry} from "./erc8004/IdentityRegistry.sol";
+import {ReputationRegistry} from "./erc8004/ReputationRegistry.sol";
 
 /// @title CommerceHub
 /// @author onchain-commerce
 /// @notice Protocol singleton that deploys and registers shops using ERC-1167 minimal proxies
 /// @dev Uses OpenZeppelin Clones for gas-efficient shop deployment
-contract CommerceHub is ICommerceHub, Ownable {
+contract CommerceHub is ICommerceHub, Ownable, IERC721Receiver {
     using Clones for address;
 
     // ──────────────────────────────────────────────
@@ -32,11 +35,20 @@ contract CommerceHub is ICommerceHub, Ownable {
     /// @notice Whether an address is a registered shop
     mapping(address => bool) public isShop;
 
+    /// @notice Identity registry for ERC-8004 agent registration
+    IdentityRegistry public identityRegistry;
+
+    /// @notice Reputation registry for ERC-8004 feedback
+    ReputationRegistry public reputationRegistry;
+
+    /// @notice Shop address → agentId in the identity registry
+    mapping(address => uint256) public shopAgentId;
+
     // ──────────────────────────────────────────────
     //  Events
     // ──────────────────────────────────────────────
 
-    event ShopCreated(address indexed shop, address indexed owner, string name, string metadataURI);
+    event ShopCreated(address indexed shop, address indexed owner, string name, string metadataURI, uint256 agentId);
     event ProtocolFeeUpdated(uint256 oldFee, uint256 newFee);
     event ProtocolFeeRecipientUpdated(address oldRecipient, address newRecipient);
     event ShopImplementationUpdated(address oldImpl, address newImpl);
@@ -55,14 +67,26 @@ contract CommerceHub is ICommerceHub, Ownable {
     /// @param _shopImplementation Address of the Shop implementation contract
     /// @param _protocolFee Initial protocol fee in basis points
     /// @param _protocolFeeRecipient Address to receive protocol fees
-    constructor(address _shopImplementation, uint256 _protocolFee, address _protocolFeeRecipient) Ownable(msg.sender) {
+    /// @param _identityRegistry Address of the ERC-8004 IdentityRegistry
+    /// @param _reputationRegistry Address of the ERC-8004 ReputationRegistry
+    constructor(
+        address _shopImplementation,
+        uint256 _protocolFee,
+        address _protocolFeeRecipient,
+        address _identityRegistry,
+        address _reputationRegistry
+    ) Ownable(msg.sender) {
         if (_shopImplementation == address(0)) revert ZeroAddress();
         if (_protocolFeeRecipient == address(0)) revert ZeroAddress();
+        if (_identityRegistry == address(0)) revert ZeroAddress();
+        if (_reputationRegistry == address(0)) revert ZeroAddress();
         if (_protocolFee > 1000) revert InvalidFee(); // max 10%
 
         shopImplementation = _shopImplementation;
         protocolFee = _protocolFee;
         protocolFeeRecipient = _protocolFeeRecipient;
+        identityRegistry = IdentityRegistry(_identityRegistry);
+        reputationRegistry = ReputationRegistry(_reputationRegistry);
     }
 
     // ──────────────────────────────────────────────
@@ -77,10 +101,25 @@ contract CommerceHub is ICommerceHub, Ownable {
         shop = shopImplementation.clone();
         Shop(payable(shop)).initialize(msg.sender, name, metadataURI, address(this));
 
+        // Register the shop as an agent in the identity registry
+        uint256 agentId = identityRegistry.register(metadataURI);
+        shopAgentId[shop] = agentId;
+
+        // Set ERC-8004 references on the shop
+        Shop(payable(shop)).setERC8004(address(reputationRegistry), agentId);
+
+        // Transfer the agent NFT to the shop owner
+        identityRegistry.transferFrom(address(this), msg.sender, agentId);
+
         shops.push(shop);
         isShop[shop] = true;
 
-        emit ShopCreated(shop, msg.sender, name, metadataURI);
+        emit ShopCreated(shop, msg.sender, name, metadataURI, agentId);
+    }
+
+    /// @notice Get the agentId for a shop
+    function getShopAgentId(address shop) external view returns (uint256) {
+        return shopAgentId[shop];
     }
 
     // ──────────────────────────────────────────────
@@ -126,5 +165,15 @@ contract CommerceHub is ICommerceHub, Ownable {
     /// @notice Get all shop addresses
     function getShops() external view returns (address[] memory) {
         return shops;
+    }
+
+    /// @notice Get the reputation registry address (used by Shop via ICommerceHub)
+    function reputationRegistryAddress() external view returns (address) {
+        return address(reputationRegistry);
+    }
+
+    /// @notice ERC721Receiver implementation to accept agent NFTs during shop creation
+    function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
+        return IERC721Receiver.onERC721Received.selector;
     }
 }
