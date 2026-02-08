@@ -3,7 +3,7 @@ import {
   NewFeedback,
   FeedbackRevoked,
   ResponseAppended,
-} from "../../generated/templates/ReputationRegistry/ReputationRegistry";
+} from "../../generated/ReputationRegistry/ReputationRegistry";
 import { Feedback, FeedbackResponse } from "../../generated/schema";
 
 function feedbackId(agentId: BigInt, clientAddress: string, feedbackIndex: BigInt): string {

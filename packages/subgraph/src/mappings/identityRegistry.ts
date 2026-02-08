@@ -1,5 +1,5 @@
 import { BigInt } from "@graphprotocol/graph-ts";
-import { Registered, URIUpdated } from "../../generated/templates/IdentityRegistry/IdentityRegistry";
+import { Registered, URIUpdated } from "../../generated/IdentityRegistry/IdentityRegistry";
 import { Agent } from "../../generated/schema";
 
 export function handleRegistered(event: Registered): void {

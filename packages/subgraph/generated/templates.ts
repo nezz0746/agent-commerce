@@ -16,34 +16,6 @@ export class Shop extends DataSourceTemplate {
   }
 }
 
-export class IdentityRegistry extends DataSourceTemplate {
-  static create(address: Address): void {
-    DataSourceTemplate.create("IdentityRegistry", [address.toHex()]);
-  }
-
-  static createWithContext(address: Address, context: DataSourceContext): void {
-    DataSourceTemplate.createWithContext(
-      "IdentityRegistry",
-      [address.toHex()],
-      context,
-    );
-  }
-}
-
-export class ReputationRegistry extends DataSourceTemplate {
-  static create(address: Address): void {
-    DataSourceTemplate.create("ReputationRegistry", [address.toHex()]);
-  }
-
-  static createWithContext(address: Address, context: DataSourceContext): void {
-    DataSourceTemplate.createWithContext(
-      "ReputationRegistry",
-      [address.toHex()],
-      context,
-    );
-  }
-}
-
 export class ValidationRegistry extends DataSourceTemplate {
   static create(address: Address): void {
     DataSourceTemplate.create("ValidationRegistry", [address.toHex()]);
