@@ -226,4 +226,59 @@ export const shopAbi = [
       { name: "value", type: "int128", indexed: false },
     ],
   },
+  // Escrow
+  {
+    type: "function",
+    name: "claimRefund",
+    inputs: [{ name: "orderId", type: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "setEscrowTimeout",
+    inputs: [{ name: "_timeout", type: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "escrowTimeout",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "orders",
+    inputs: [{ name: "", type: "uint256" }],
+    outputs: [
+      { name: "customer", type: "address" },
+      { name: "totalAmount", type: "uint256" },
+      { name: "protocolFeeAmount", type: "uint256" },
+      { name: "escrowAmount", type: "uint256" },
+      { name: "status", type: "uint8" },
+      { name: "createdAt", type: "uint256" },
+      { name: "shippingHash", type: "bytes32" },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "event",
+    name: "RefundClaimed",
+    inputs: [
+      { name: "orderId", type: "uint256", indexed: true },
+      { name: "customer", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
+    anonymous: false,
+  },
+  {
+    type: "event",
+    name: "EscrowTimeoutUpdated",
+    inputs: [
+      { name: "newTimeout", type: "uint256", indexed: false },
+    ],
+    anonymous: false,
+  },
 ] as const;

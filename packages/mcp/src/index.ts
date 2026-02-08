@@ -4,6 +4,7 @@ import { registerReadTools } from "./tools/read.js";
 import { registerWriteTools } from "./tools/write.js";
 import { registerAdminTools } from "./tools/admin.js";
 import { registerERC8004Tools } from "./tools/erc8004.js";
+import { registerEscrowTools } from "./tools/escrow.js";
 
 const server = new McpServer({
   name: "onchain-commerce",
@@ -15,6 +16,7 @@ registerReadTools(server);
 registerWriteTools(server);
 registerAdminTools(server);
 registerERC8004Tools(server);
+registerEscrowTools(server);
 
 // Start the server with stdio transport
 const transport = new StdioServerTransport();
