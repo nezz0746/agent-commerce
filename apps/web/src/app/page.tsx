@@ -7,6 +7,7 @@ import { shortenAddress } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowRight } from "lucide-react";
+import { AgentBadge } from "@/components/AgentBadge";
 
 function ShopCard({ address }: { address: `0x${string}` }) {
   const { data: name } = useReadContract({
@@ -38,9 +39,12 @@ function ShopCard({ address }: { address: `0x${string}` }) {
             </div>
             <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
           </div>
-          <p className="mt-3 text-sm text-muted-foreground">
-            {count} {count === 1 ? "product" : "products"}
-          </p>
+          <div className="mt-3 flex items-center gap-2">
+            <p className="text-sm text-muted-foreground">
+              {count} {count === 1 ? "product" : "products"}
+            </p>
+            <AgentBadge shopAddress={address} />
+          </div>
         </CardContent>
       </Card>
     </Link>

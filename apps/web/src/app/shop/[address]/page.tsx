@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { ShoppingBag } from "lucide-react";
 import { useProductMetadata } from "@/hooks/use-product-metadata";
+import { AgentInfoPanel } from "@/components/AgentBadge";
 import Image from "next/image";
 
 function ProductCard({
@@ -199,6 +200,7 @@ export default function ShopPage() {
         <p className="text-sm text-muted-foreground">
           {shortenAddress(address)} &middot; {productCount} products
         </p>
+        <AgentInfoPanel shopAddress={address} />
       </div>
 
       {/* Categories */}

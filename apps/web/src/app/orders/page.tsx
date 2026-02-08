@@ -4,6 +4,7 @@ import { useAccount, useReadContract } from "wagmi";
 import { commerceHubConfig, shopAbi } from "@/lib/contracts";
 import { formatPrice } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
+import { EscrowStatus } from "@/components/EscrowStatus";
 
 const STATUS_LABELS = ["Created", "Paid", "Fulfilled", "Completed", "Cancelled", "Refunded"];
 
@@ -24,8 +25,9 @@ function OrderRow({
   const { address } = useAccount();
 
   if (!data) return null;
-  const [customer, totalAmount, , status, createdAt] = data as [
+  const [customer, totalAmount, , escrowAmount, status, createdAt] = data as [
     string,
+    bigint,
     bigint,
     bigint,
     number,
@@ -36,21 +38,30 @@ function OrderRow({
   if (customer.toLowerCase() !== address?.toLowerCase()) return null;
 
   return (
-    <div className="flex items-center justify-between border-b py-3 last:border-0">
-      <div className="space-y-0.5">
-        <p className="text-sm font-medium">#{orderId}</p>
-        <p className="text-xs text-muted-foreground">
-          {new Date(Number(createdAt) * 1000).toLocaleDateString()}
-        </p>
+    <div className="border-b py-3 last:border-0 space-y-1.5">
+      <div className="flex items-center justify-between">
+        <div className="space-y-0.5">
+          <p className="text-sm font-medium">#{orderId}</p>
+          <p className="text-xs text-muted-foreground">
+            {new Date(Number(createdAt) * 1000).toLocaleDateString()}
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <span className="text-sm tabular-nums text-muted-foreground">
+            {formatPrice(totalAmount)}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {STATUS_LABELS[status]}
+          </span>
+        </div>
       </div>
-      <div className="flex items-center gap-4">
-        <span className="text-sm tabular-nums text-muted-foreground">
-          {formatPrice(totalAmount)}
-        </span>
-        <span className="text-xs text-muted-foreground">
-          {STATUS_LABELS[status]}
-        </span>
-      </div>
+      <EscrowStatus
+        shopAddress={shopAddress}
+        orderId={orderId}
+        status={status}
+        escrowAmount={escrowAmount}
+        createdAt={createdAt}
+      />
     </div>
   );
 }
