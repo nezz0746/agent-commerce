@@ -1,49 +1,56 @@
 "use client";
 
 import Link from "next/link";
-import { useReadContract } from "wagmi";
-import { commerceHubConfig, shopAbi } from "@/lib/contracts";
+import { useShops } from "@/hooks/useSubgraph";
 import { shortenAddress } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowRight } from "lucide-react";
-import { AgentBadge } from "@/components/AgentBadge";
+import { Badge } from "@/components/ui/badge";
+import { ArrowRight, ShieldCheck, Star } from "lucide-react";
+import type { SubgraphShop, SubgraphReview } from "@/lib/subgraph";
 
-function ShopCard({ address }: { address: `0x${string}` }) {
-  const { data: name } = useReadContract({
-    address,
-    abi: shopAbi,
-    functionName: "name",
-  });
+function getReviewStats(reviews: Pick<SubgraphReview, "rating">[]) {
+  if (!reviews || reviews.length === 0) return null;
+  const avg = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
+  return { avg: Math.round(avg * 10) / 10, count: reviews.length };
+}
 
-  const { data: productCount } = useReadContract({
-    address,
-    abi: shopAbi,
-    functionName: "nextProductId",
-  });
-
-  const count = productCount ? Number(productCount) - 1 : 0;
+function ShopCard({ shop }: { shop: SubgraphShop }) {
+  const productCount = shop.products?.length ?? 0;
+  const stats = getReviewStats(shop.reviews as Pick<SubgraphReview, "rating">[]);
+  const hasAgent = shop.agentId && shop.agentId !== "0";
 
   return (
-    <Link href={`/shop/${address}`} className="group block">
+    <Link href={`/shop/${shop.address}`} className="group block">
       <Card className="transition-colors hover:border-primary/30">
         <CardContent className="p-5">
           <div className="flex items-start justify-between">
             <div>
               <p className="font-medium group-hover:text-primary transition-colors">
-                {(name as string) || "Loading..."}
+                {shop.name || "Unnamed Shop"}
               </p>
               <p className="mt-1 font-mono text-xs text-muted-foreground">
-                {shortenAddress(address)}
+                {shortenAddress(shop.address)}
               </p>
             </div>
             <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
           </div>
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
             <p className="text-sm text-muted-foreground">
-              {count} {count === 1 ? "product" : "products"}
+              {productCount} {productCount === 1 ? "product" : "products"}
             </p>
-            <AgentBadge shopAddress={address} />
+            {stats && (
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                {stats.avg}/5 · {stats.count} review{stats.count !== 1 ? "s" : ""}
+              </span>
+            )}
+            {hasAgent && (
+              <Badge variant="secondary" className="gap-1 text-[10px] font-normal">
+                <ShieldCheck className="h-3 w-3" />
+                ERC-8004
+              </Badge>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -64,10 +71,7 @@ function ShopCardSkeleton() {
 }
 
 export default function Home() {
-  const { data: shops, isLoading } = useReadContract({
-    ...commerceHubConfig,
-    functionName: "getShops",
-  });
+  const { data: shops, isLoading } = useShops();
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -84,7 +88,7 @@ export default function Home() {
             <ShopCardSkeleton key={i} />
           ))}
         </div>
-      ) : !shops || (shops as `0x${string}`[]).length === 0 ? (
+      ) : !shops || shops.length === 0 ? (
         <div className="py-16 text-center">
           <p className="text-sm text-muted-foreground">
             No shops yet. Deploy contracts and seed data to get started.
@@ -92,8 +96,8 @@ export default function Home() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {(shops as `0x${string}`[]).map((addr) => (
-            <ShopCard key={addr} address={addr} />
+          {shops.map((shop) => (
+            <ShopCard key={shop.id} shop={shop} />
           ))}
         </div>
       )}

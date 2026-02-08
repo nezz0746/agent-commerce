@@ -90,6 +90,8 @@ export function ReviewButton({
       setStars(0);
       // Invalidate all queries to refetch review data
       queryClient.invalidateQueries();
+      // Delayed invalidation for subgraph indexing lag
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: ["subgraph"] }), 5000);
     }
   }, [isSuccess, queryClient]);
 

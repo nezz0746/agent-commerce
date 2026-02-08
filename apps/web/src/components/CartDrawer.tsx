@@ -6,6 +6,7 @@ import {
   useWaitForTransactionReceipt,
   useWriteContract,
 } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   getCart,
   removeFromCart,
@@ -45,6 +46,7 @@ export function CartDrawer({
   const [items, setItems] = useState<CartItem[]>([]);
   const { isConnected } = useAccount();
   const { writeContract, data: txHash, isPending } = useWriteContract();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const update = () => setItems(getCart());
@@ -62,8 +64,10 @@ export function CartDrawer({
       toast.success("Order placed!", {
         description: "Your onchain order has been confirmed.",
       });
+      // Delayed invalidation for subgraph indexing lag
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: ["subgraph"] }), 5000);
     }
-  }, [isSuccess]);
+  }, [isSuccess, queryClient]);
 
   const byShop = items.reduce(
     (acc, item) => {

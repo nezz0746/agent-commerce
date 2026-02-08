@@ -1,28 +1,14 @@
 "use client";
 
-import { useReadContract } from "wagmi";
-import { shopAbi, reputationRegistryConfig } from "@/lib/contracts";
+import { useReviews } from "@/hooks/useSubgraph";
 import { Star } from "lucide-react";
 
 export function ShopRatingSummary({ shopAddress }: { shopAddress: `0x${string}` }) {
-  const { data: agentId } = useReadContract({
-    address: shopAddress,
-    abi: shopAbi,
-    functionName: "agentId",
-  });
+  const { data: reviews } = useReviews(shopAddress);
 
-  const { data: summary } = useReadContract({
-    ...reputationRegistryConfig,
-    functionName: "getSummary",
-    args: agentId ? [agentId as bigint, [], "starred", ""] : undefined,
-    query: { enabled: !!agentId },
-  });
+  if (!reviews || reviews.length === 0) return null;
 
-  if (!summary) return null;
-  const [count, summaryValue] = summary as [bigint, bigint, number];
-  if (Number(count) === 0) return null;
-
-  const avgScore = Number(summaryValue) / Number(count);
+  const avgScore = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
   const avgStars = Math.round(avgScore / 20);
 
   return (
@@ -38,7 +24,7 @@ export function ShopRatingSummary({ shopAddress }: { shopAddress: `0x${string}` 
         ))}
       </div>
       <span className="text-sm text-muted-foreground">
-        {avgScore.toFixed(0)}/100 · {Number(count)} review{Number(count) !== 1 ? "s" : ""}
+        {avgScore.toFixed(0)}/100 · {reviews.length} review{reviews.length !== 1 ? "s" : ""}
       </span>
     </div>
   );

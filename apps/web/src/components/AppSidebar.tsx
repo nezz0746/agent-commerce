@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+
 import { Store, Package, LayoutDashboard } from "lucide-react";
 import {
   Sidebar,
@@ -20,22 +20,12 @@ import { ConnectKitButton } from "connectkit";
 
 const navItems = [
   { title: "Marketplace", href: "/", icon: Store },
-  { title: "Cart", href: "/cart", icon: ShoppingCart },
   { title: "Orders", href: "/orders", icon: Package },
   { title: "Admin", href: "/admin", icon: LayoutDashboard },
 ];
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const [cartCount, setCartCount] = useState(0);
-
-  useEffect(() => {
-    const update = () => setCartCount(getCart().length);
-    update();
-    window.addEventListener("cart-updated", update);
-    return () => window.removeEventListener("cart-updated", update);
-  }, []);
-
   return (
     <Sidebar>
       <SidebarHeader>
@@ -73,9 +63,6 @@ export function AppSidebar() {
                         <span>{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
-                    {item.href === "/cart" && cartCount > 0 && (
-                      <SidebarMenuBadge>{cartCount}</SidebarMenuBadge>
-                    )}
                   </SidebarMenuItem>
                 );
               })}

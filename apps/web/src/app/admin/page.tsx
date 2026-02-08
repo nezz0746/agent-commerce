@@ -3,13 +3,13 @@
 import { useState } from "react";
 import {
   useAccount,
-  useReadContract,
   useWriteContract,
 } from "wagmi";
-import { commerceHubConfig, shopAbi } from "@/lib/contracts";
+import { shopAbi, commerceHubConfig } from "@/lib/contracts";
 import { formatPrice, shortenAddress } from "@/lib/utils";
 import { optimismSepolia } from "wagmi/chains";
 import { keccak256, toBytes } from "viem";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,8 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Plus, Truck } from "lucide-react";
+import { useShops, useShop } from "@/hooks/useSubgraph";
+import type { SubgraphShop } from "@/lib/subgraph";
 
 const STATUS_LABELS = ["Created", "Paid", "Fulfilled", "Completed", "Cancelled", "Refunded"];
 
@@ -26,6 +28,7 @@ function CreateShop() {
   const [name, setName] = useState("");
   const [uri, setUri] = useState("");
   const { writeContract, isPending } = useWriteContract();
+  const queryClient = useQueryClient();
 
   return (
     <Card>
@@ -56,6 +59,10 @@ function CreateShop() {
               functionName: "createShop",
               args: [name, uri],
               chainId: optimismSepolia.id,
+            }, {
+              onSuccess: () => {
+                setTimeout(() => queryClient.invalidateQueries({ queryKey: ["subgraph"] }), 5000);
+              },
             })
           }
           disabled={!name || isPending}
@@ -76,17 +83,24 @@ function CreateShop() {
 
 // ─── Shop Admin Panel ───
 
-function ShopAdmin({ address }: { address: `0x${string}` }) {
-  const { data: name } = useReadContract({ address, abi: shopAbi, functionName: "name" });
+function ShopAdmin({ address }: { address: string }) {
+  const { data: shop } = useShop(address);
 
   return (
     <Card>
       <CardContent className="pt-5">
         <div className="mb-4">
-          <p className="font-medium">{name as string}</p>
+          <p className="font-medium">{shop?.name ?? "Loading..."}</p>
           <p className="font-mono text-xs text-muted-foreground">
             {shortenAddress(address)}
           </p>
+          {shop && (
+            <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
+              <span>{shop.products?.length ?? 0} products</span>
+              <span>{shop.orders?.length ?? 0} orders</span>
+              <span>{shop.reviews?.length ?? 0} reviews</span>
+            </div>
+          )}
         </div>
         <Tabs defaultValue="products">
           <TabsList className="w-full justify-start">
@@ -99,22 +113,22 @@ function ShopAdmin({ address }: { address: `0x${string}` }) {
           </TabsList>
 
           <TabsContent value="products" className="mt-4">
-            <ProductsTab shopAddress={address} />
+            <ProductsTab shop={shop} shopAddress={address} />
           </TabsContent>
           <TabsContent value="orders" className="mt-4">
-            <OrdersTab shopAddress={address} />
+            <OrdersTab shop={shop} shopAddress={address} />
           </TabsContent>
           <TabsContent value="categories" className="mt-4">
-            <CategoriesTab shopAddress={address} />
+            <CategoriesTab shop={shop} shopAddress={address} />
           </TabsContent>
           <TabsContent value="discounts" className="mt-4">
-            <DiscountsTab shopAddress={address} />
+            <DiscountsTab shop={shop} shopAddress={address} />
           </TabsContent>
           <TabsContent value="employees" className="mt-4">
             <EmployeesTab shopAddress={address} />
           </TabsContent>
           <TabsContent value="settings" className="mt-4">
-            <SettingsTab shopAddress={address} />
+            <SettingsTab shop={shop} shopAddress={address} />
           </TabsContent>
         </Tabs>
       </CardContent>
@@ -124,15 +138,14 @@ function ShopAdmin({ address }: { address: `0x${string}` }) {
 
 // ─── Products Tab ───
 
-function ProductsTab({ shopAddress }: { shopAddress: `0x${string}` }) {
-  const { data: nextId } = useReadContract({ address: shopAddress, abi: shopAbi, functionName: "nextProductId" });
-  const count = nextId ? Number(nextId) - 1 : 0;
+function ProductsTab({ shop, shopAddress }: { shop: SubgraphShop | null | undefined; shopAddress: string }) {
+  const products = shop?.products ?? [];
   const [showForm, setShowForm] = useState(false);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">{count} products</p>
+        <p className="text-sm text-muted-foreground">{products.length} products</p>
         <Button variant="outline" size="sm" onClick={() => setShowForm(!showForm)}>
           <Plus className="h-3.5 w-3.5" />
           New Product
@@ -140,10 +153,22 @@ function ProductsTab({ shopAddress }: { shopAddress: `0x${string}` }) {
       </div>
       {showForm && <CreateProductForm shopAddress={shopAddress} onDone={() => setShowForm(false)} />}
       <div className="space-y-2">
-        {Array.from({ length: count }, (_, i) => (
-          <ProductRow key={i + 1} shopAddress={shopAddress} productId={i + 1} />
+        {products.map((p) => (
+          <div
+            key={p.id}
+            className={`flex items-center justify-between border-b py-2.5 last:border-0 ${!p.active ? "opacity-40" : ""}`}
+          >
+            <div>
+              <span className="text-sm font-medium">{p.name}</span>
+              <span className="ml-2 text-xs text-muted-foreground">#{p.productId}</span>
+            </div>
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <span className="tabular-nums">{formatPrice(BigInt(p.price))}</span>
+              <span className="tabular-nums">{Number(p.stock)} stock</span>
+            </div>
+          </div>
         ))}
-        {count === 0 && (
+        {products.length === 0 && (
           <p className="py-8 text-center text-sm text-muted-foreground">
             No products yet. Create your first product above.
           </p>
@@ -153,31 +178,13 @@ function ProductsTab({ shopAddress }: { shopAddress: `0x${string}` }) {
   );
 }
 
-function ProductRow({ shopAddress, productId }: { shopAddress: `0x${string}`; productId: number }) {
-  const { data } = useReadContract({ address: shopAddress, abi: shopAbi, functionName: "products", args: [BigInt(productId)] });
-  if (!data) return null;
-  const [name, price, stock, , , active] = data as [string, bigint, bigint, bigint, string, boolean];
-
-  return (
-    <div className={`flex items-center justify-between border-b py-2.5 last:border-0 ${!active ? "opacity-40" : ""}`}>
-      <div>
-        <span className="text-sm font-medium">{name}</span>
-        <span className="ml-2 text-xs text-muted-foreground">#{productId}</span>
-      </div>
-      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-        <span className="tabular-nums">{formatPrice(price)}</span>
-        <span className="tabular-nums">{Number(stock)} stock</span>
-      </div>
-    </div>
-  );
-}
-
-function CreateProductForm({ shopAddress, onDone }: { shopAddress: `0x${string}`; onDone: () => void }) {
+function CreateProductForm({ shopAddress, onDone }: { shopAddress: string; onDone: () => void }) {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
   const [categoryId, setCategoryId] = useState("1");
   const { writeContract, isPending } = useWriteContract();
+  const queryClient = useQueryClient();
 
   return (
     <Card>
@@ -204,11 +211,15 @@ function CreateProductForm({ shopAddress, onDone }: { shopAddress: `0x${string}`
           <Button
             onClick={() => {
               writeContract({
-                address: shopAddress,
+                address: shopAddress as `0x${string}`,
                 abi: shopAbi,
                 functionName: "createProduct",
                 args: [name, BigInt(Math.floor(parseFloat(price) * 1e18)), BigInt(stock), BigInt(categoryId), ""],
                 chainId: optimismSepolia.id,
+              }, {
+                onSuccess: () => {
+                  setTimeout(() => queryClient.invalidateQueries({ queryKey: ["subgraph"] }), 5000);
+                },
               });
               onDone();
             }}
@@ -229,18 +240,17 @@ function CreateProductForm({ shopAddress, onDone }: { shopAddress: `0x${string}`
 
 // ─── Orders Tab ───
 
-function OrdersTab({ shopAddress }: { shopAddress: `0x${string}` }) {
-  const { data: nextId } = useReadContract({ address: shopAddress, abi: shopAbi, functionName: "nextOrderId" });
-  const count = nextId ? Number(nextId) - 1 : 0;
+function OrdersTab({ shop, shopAddress }: { shop: SubgraphShop | null | undefined; shopAddress: string }) {
+  const orders = shop?.orders ?? [];
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">{count} orders</p>
+      <p className="text-sm text-muted-foreground">{orders.length} orders</p>
       <div className="space-y-2">
-        {Array.from({ length: count }, (_, i) => (
-          <AdminOrderRow key={i + 1} shopAddress={shopAddress} orderId={count - i} />
+        {orders.map((order) => (
+          <AdminOrderRow key={order.id} order={order} shopAddress={shopAddress} />
         ))}
-        {count === 0 && (
+        {orders.length === 0 && (
           <p className="py-8 text-center text-sm text-muted-foreground">
             No orders yet.
           </p>
@@ -250,32 +260,44 @@ function OrdersTab({ shopAddress }: { shopAddress: `0x${string}` }) {
   );
 }
 
-function AdminOrderRow({ shopAddress, orderId }: { shopAddress: `0x${string}`; orderId: number }) {
-  const { data } = useReadContract({ address: shopAddress, abi: shopAbi, functionName: "orders", args: [BigInt(orderId)] });
-  const { writeContract, isPending } = useWriteContract();
+const STATUS_INDEX: Record<string, number> = {
+  Created: 0, Paid: 1, Fulfilled: 2, Completed: 3, Cancelled: 4, Refunded: 5,
+};
 
-  if (!data) return null;
-  const [customer, totalAmount, , status, createdAt] = data as [string, bigint, bigint, number, bigint, string];
+function AdminOrderRow({ order, shopAddress }: { order: SubgraphShop["orders"][number]; shopAddress: string }) {
+  const { writeContract, isPending } = useWriteContract();
+  const queryClient = useQueryClient();
+  const statusNum = STATUS_INDEX[order.status] ?? 0;
 
   return (
     <div className="flex items-center justify-between border-b py-2.5 last:border-0">
       <div>
-        <span className="text-sm font-medium">#{orderId}</span>
+        <span className="text-sm font-medium">#{order.orderId}</span>
         <span className="ml-2 font-mono text-xs text-muted-foreground">
-          {shortenAddress(customer)}
+          {shortenAddress(order.customer.address)}
         </span>
         <span className="ml-2 text-xs text-muted-foreground">
-          {new Date(Number(createdAt) * 1000).toLocaleDateString()}
+          {new Date(Number(order.createdAt) * 1000).toLocaleDateString()}
         </span>
       </div>
       <div className="flex items-center gap-3">
-        <span className="text-xs tabular-nums text-muted-foreground">{formatPrice(totalAmount)}</span>
-        <span className="text-xs text-muted-foreground">{STATUS_LABELS[status]}</span>
-        {status === 1 && (
+        <span className="text-xs tabular-nums text-muted-foreground">{formatPrice(BigInt(order.totalAmount))}</span>
+        <span className="text-xs text-muted-foreground">{STATUS_LABELS[statusNum]}</span>
+        {statusNum === 1 && (
           <Button
             size="sm"
             variant="outline"
-            onClick={() => writeContract({ address: shopAddress, abi: shopAbi, functionName: "fulfillOrder", args: [BigInt(orderId)], chainId: optimismSepolia.id })}
+            onClick={() => writeContract({
+              address: shopAddress as `0x${string}`,
+              abi: shopAbi,
+              functionName: "fulfillOrder",
+              args: [BigInt(order.orderId)],
+              chainId: optimismSepolia.id,
+            }, {
+              onSuccess: () => {
+                setTimeout(() => queryClient.invalidateQueries({ queryKey: ["subgraph"] }), 5000);
+              },
+            })}
             disabled={isPending}
           >
             {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Truck className="h-3.5 w-3.5" />}
@@ -289,29 +311,38 @@ function AdminOrderRow({ shopAddress, orderId }: { shopAddress: `0x${string}`; o
 
 // ─── Categories Tab ───
 
-function CategoriesTab({ shopAddress }: { shopAddress: `0x${string}` }) {
-  const { data: nextId } = useReadContract({ address: shopAddress, abi: shopAbi, functionName: "nextCategoryId" });
-  const count = nextId ? Number(nextId) - 1 : 0;
+function CategoriesTab({ shop, shopAddress }: { shop: SubgraphShop | null | undefined; shopAddress: string }) {
+  const categories = shop?.categories ?? [];
   const [name, setName] = useState("");
   const { writeContract, isPending } = useWriteContract();
+  const queryClient = useQueryClient();
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">{count} categories</p>
+      <p className="text-sm text-muted-foreground">{categories.length} categories</p>
       <div className="space-y-2">
-        {Array.from({ length: count }, (_, i) => (
-          <CategoryRow key={i + 1} shopAddress={shopAddress} categoryId={i + 1} />
+        {categories.map((cat) => (
+          <div key={cat.id} className={`flex items-center gap-2 border-b py-2.5 last:border-0 ${!cat.active ? "opacity-40" : ""}`}>
+            <span className="text-sm">{cat.name}</span>
+            <span className="text-xs text-muted-foreground">#{cat.categoryId}</span>
+          </div>
         ))}
       </div>
       <div className="flex gap-2">
-        <Input
-          placeholder="New category name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
+        <Input placeholder="New category name" value={name} onChange={(e) => setName(e.target.value)} />
         <Button
           onClick={() => {
-            writeContract({ address: shopAddress, abi: shopAbi, functionName: "createCategory", args: [name, ""], chainId: optimismSepolia.id });
+            writeContract({
+              address: shopAddress as `0x${string}`,
+              abi: shopAbi,
+              functionName: "createCategory",
+              args: [name, ""],
+              chainId: optimismSepolia.id,
+            }, {
+              onSuccess: () => {
+                setTimeout(() => queryClient.invalidateQueries({ queryKey: ["subgraph"] }), 5000);
+              },
+            });
             setName("");
           }}
           disabled={!name || isPending}
@@ -326,34 +357,30 @@ function CategoriesTab({ shopAddress }: { shopAddress: `0x${string}` }) {
   );
 }
 
-function CategoryRow({ shopAddress, categoryId }: { shopAddress: `0x${string}`; categoryId: number }) {
-  const { data } = useReadContract({ address: shopAddress, abi: shopAbi, functionName: "categories", args: [BigInt(categoryId)] });
-  if (!data) return null;
-  const [name, , active] = data as [string, string, boolean];
-  return (
-    <div className={`flex items-center gap-2 border-b py-2.5 last:border-0 ${!active ? "opacity-40" : ""}`}>
-      <span className="text-sm">{name}</span>
-      <span className="text-xs text-muted-foreground">#{categoryId}</span>
-    </div>
-  );
-}
-
 // ─── Discounts Tab ───
 
-function DiscountsTab({ shopAddress }: { shopAddress: `0x${string}` }) {
-  const { data: nextId } = useReadContract({ address: shopAddress, abi: shopAbi, functionName: "nextDiscountId" });
-  const count = nextId ? Number(nextId) - 1 : 0;
+function DiscountsTab({ shop, shopAddress }: { shop: SubgraphShop | null | undefined; shopAddress: string }) {
+  const discounts = shop?.discounts ?? [];
   const [code, setCode] = useState("");
   const [bps, setBps] = useState("1000");
   const [maxUses, setMaxUses] = useState("100");
   const { writeContract, isPending } = useWriteContract();
+  const queryClient = useQueryClient();
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">{count} discounts</p>
+      <p className="text-sm text-muted-foreground">{discounts.length} discounts</p>
       <div className="space-y-2">
-        {Array.from({ length: count }, (_, i) => (
-          <DiscountRow key={i + 1} shopAddress={shopAddress} discountId={i + 1} />
+        {discounts.map((d) => (
+          <div key={d.id} className={`flex items-center justify-between border-b py-2.5 last:border-0 ${!d.active ? "opacity-40" : ""}`}>
+            <div className="flex items-center gap-2">
+              <span className="text-sm">#{d.discountId}</span>
+              <span className="text-xs text-muted-foreground">{Number(d.basisPoints) / 100}% off</span>
+            </div>
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {Number(d.usedCount)}/{Number(d.maxUses)} used
+            </span>
+          </div>
         ))}
       </div>
 
@@ -376,7 +403,17 @@ function DiscountsTab({ shopAddress }: { shopAddress: `0x${string}` }) {
           onClick={() => {
             const codeHash = keccak256(toBytes(code));
             const expires = BigInt(Math.floor(Date.now() / 1000) + 365 * 86400);
-            writeContract({ address: shopAddress, abi: shopAbi, functionName: "createDiscount", args: [codeHash, BigInt(bps), BigInt(maxUses), expires], chainId: optimismSepolia.id });
+            writeContract({
+              address: shopAddress as `0x${string}`,
+              abi: shopAbi,
+              functionName: "createDiscount",
+              args: [codeHash, BigInt(bps), BigInt(maxUses), expires],
+              chainId: optimismSepolia.id,
+            }, {
+              onSuccess: () => {
+                setTimeout(() => queryClient.invalidateQueries({ queryKey: ["subgraph"] }), 5000);
+              },
+            });
             setCode("");
           }}
           disabled={!code || isPending}
@@ -390,28 +427,12 @@ function DiscountsTab({ shopAddress }: { shopAddress: `0x${string}` }) {
   );
 }
 
-function DiscountRow({ shopAddress, discountId }: { shopAddress: `0x${string}`; discountId: number }) {
-  const { data } = useReadContract({ address: shopAddress, abi: shopAbi, functionName: "discounts", args: [BigInt(discountId)] });
-  if (!data) return null;
-  const [, basisPoints, maxUses, usedCount, , active] = data as [string, bigint, bigint, bigint, bigint, boolean];
-  return (
-    <div className={`flex items-center justify-between border-b py-2.5 last:border-0 ${!active ? "opacity-40" : ""}`}>
-      <div className="flex items-center gap-2">
-        <span className="text-sm">#{discountId}</span>
-        <span className="text-xs text-muted-foreground">{Number(basisPoints) / 100}% off</span>
-      </div>
-      <span className="text-xs tabular-nums text-muted-foreground">
-        {Number(usedCount)}/{Number(maxUses)} used
-      </span>
-    </div>
-  );
-}
-
 // ─── Employees Tab ───
 
-function EmployeesTab({ shopAddress }: { shopAddress: `0x${string}` }) {
+function EmployeesTab({ shopAddress }: { shopAddress: string }) {
   const [addr, setAddr] = useState("");
   const { writeContract, isPending } = useWriteContract();
+  const queryClient = useQueryClient();
   const MANAGER_ROLE = keccak256(toBytes("MANAGER_ROLE"));
 
   return (
@@ -426,7 +447,17 @@ function EmployeesTab({ shopAddress }: { shopAddress: `0x${string}` }) {
         />
         <Button
           onClick={() => {
-            writeContract({ address: shopAddress, abi: shopAbi, functionName: "addEmployee", args: [addr as `0x${string}`, MANAGER_ROLE], chainId: optimismSepolia.id });
+            writeContract({
+              address: shopAddress as `0x${string}`,
+              abi: shopAbi,
+              functionName: "addEmployee",
+              args: [addr as `0x${string}`, MANAGER_ROLE],
+              chainId: optimismSepolia.id,
+            }, {
+              onSuccess: () => {
+                setTimeout(() => queryClient.invalidateQueries({ queryKey: ["subgraph"] }), 5000);
+              },
+            });
             setAddr("");
           }}
           disabled={!addr || isPending}
@@ -443,12 +474,11 @@ function EmployeesTab({ shopAddress }: { shopAddress: `0x${string}` }) {
 
 // ─── Settings Tab ───
 
-function SettingsTab({ shopAddress }: { shopAddress: `0x${string}` }) {
-  const { data: metadataURI } = useReadContract({ address: shopAddress, abi: shopAbi, functionName: "metadataURI" });
-  const { data: splitAddr } = useReadContract({ address: shopAddress, abi: shopAbi, functionName: "paymentSplitAddress" });
+function SettingsTab({ shop, shopAddress }: { shop: SubgraphShop | null | undefined; shopAddress: string }) {
   const [newUri, setNewUri] = useState("");
   const [newSplit, setNewSplit] = useState("");
   const { writeContract, isPending } = useWriteContract();
+  const queryClient = useQueryClient();
 
   return (
     <div className="space-y-6">
@@ -456,13 +486,23 @@ function SettingsTab({ shopAddress }: { shopAddress: `0x${string}` }) {
         <div>
           <Label>Metadata URI</Label>
           <p className="mt-1 text-xs text-muted-foreground">
-            {(metadataURI as string) || "Not set"}
+            {shop?.metadataURI || "Not set"}
           </p>
         </div>
         <div className="flex gap-2">
           <Input placeholder="New metadata URI" value={newUri} onChange={(e) => setNewUri(e.target.value)} />
           <Button
-            onClick={() => writeContract({ address: shopAddress, abi: shopAbi, functionName: "setMetadataURI", args: [newUri], chainId: optimismSepolia.id })}
+            onClick={() => writeContract({
+              address: shopAddress as `0x${string}`,
+              abi: shopAbi,
+              functionName: "setMetadataURI",
+              args: [newUri],
+              chainId: optimismSepolia.id,
+            }, {
+              onSuccess: () => {
+                setTimeout(() => queryClient.invalidateQueries({ queryKey: ["subgraph"] }), 5000);
+              },
+            })}
             disabled={!newUri || isPending}
             variant="outline"
             size="sm"
@@ -479,11 +519,11 @@ function SettingsTab({ shopAddress }: { shopAddress: `0x${string}` }) {
         <div>
           <Label>Payment Split Address</Label>
           <p className="mt-1 text-xs text-muted-foreground">
-            {!splitAddr
+            {!shop?.paymentSplitAddress
               ? "Loading..."
-              : (splitAddr as string) === "0x0000000000000000000000000000000000000000"
+              : shop.paymentSplitAddress === "0x0000000000000000000000000000000000000000"
               ? "Not set (defaults to owner)"
-              : shortenAddress(splitAddr as string)}
+              : shortenAddress(shop.paymentSplitAddress)}
           </p>
         </div>
         <div className="flex gap-2">
@@ -494,7 +534,17 @@ function SettingsTab({ shopAddress }: { shopAddress: `0x${string}` }) {
             className="font-mono"
           />
           <Button
-            onClick={() => writeContract({ address: shopAddress, abi: shopAbi, functionName: "setPaymentSplit", args: [newSplit as `0x${string}`], chainId: optimismSepolia.id })}
+            onClick={() => writeContract({
+              address: shopAddress as `0x${string}`,
+              abi: shopAbi,
+              functionName: "setPaymentSplit",
+              args: [newSplit as `0x${string}`],
+              chainId: optimismSepolia.id,
+            }, {
+              onSuccess: () => {
+                setTimeout(() => queryClient.invalidateQueries({ queryKey: ["subgraph"] }), 5000);
+              },
+            })}
             disabled={!newSplit || isPending}
             variant="outline"
             size="sm"
@@ -512,7 +562,7 @@ function SettingsTab({ shopAddress }: { shopAddress: `0x${string}` }) {
 
 export default function AdminPage() {
   const { isConnected } = useAccount();
-  const { data: shops } = useReadContract({ ...commerceHubConfig, functionName: "getShops" });
+  const { data: shops } = useShops();
 
   if (!isConnected) {
     return (
@@ -530,10 +580,10 @@ export default function AdminPage() {
 
       <div className="space-y-4">
         <p className="text-sm font-medium">Your Shops</p>
-        {shops && (shops as `0x${string}`[]).length > 0 ? (
+        {shops && shops.length > 0 ? (
           <div className="space-y-6">
-            {(shops as `0x${string}`[]).map((addr) => (
-              <ShopAdmin key={addr} address={addr} />
+            {shops.map((shop) => (
+              <ShopAdmin key={shop.id} address={shop.address} />
             ))}
           </div>
         ) : (
