@@ -1,0 +1,126 @@
+type Protocol @entity {
+  id: ID!
+  hub: Bytes!
+  protocolFee: BigInt!
+  shopCount: BigInt!
+  shops: [Shop!]! @derivedFrom(field: "protocol")
+}
+
+type Shop @entity {
+  id: ID!
+  address: Bytes!
+  owner: Bytes!
+  name: String!
+  metadataURI: String!
+  paymentSplitAddress: Bytes
+  createdAt: BigInt!
+  protocol: Protocol!
+  products: [Product!]! @derivedFrom(field: "shop")
+  categories: [Category!]! @derivedFrom(field: "shop")
+  collections: [Collection!]! @derivedFrom(field: "shop")
+  orders: [Order!]! @derivedFrom(field: "shop")
+  employees: [Employee!]! @derivedFrom(field: "shop")
+  discounts: [Discount!]! @derivedFrom(field: "shop")
+  reviews: [Review!]! @derivedFrom(field: "shop")
+}
+
+type Product @entity {
+  id: ID!
+  productId: BigInt!
+  shop: Shop!
+  name: String!
+  price: BigInt!
+  stock: BigInt!
+  category: Category
+  metadataURI: String!
+  active: Boolean!
+  variants: [Variant!]! @derivedFrom(field: "product")
+  createdAt: BigInt!
+}
+
+type Variant @entity {
+  id: ID!
+  variantId: BigInt!
+  product: Product!
+  name: String!
+  price: BigInt!
+  stock: BigInt!
+  active: Boolean!
+}
+
+type Category @entity {
+  id: ID!
+  categoryId: BigInt!
+  shop: Shop!
+  name: String!
+  metadataURI: String!
+  active: Boolean!
+  products: [Product!]! @derivedFrom(field: "category")
+}
+
+type Collection @entity {
+  id: ID!
+  collectionId: BigInt!
+  shop: Shop!
+  name: String!
+  productIds: [BigInt!]!
+  metadataURI: String!
+  active: Boolean!
+}
+
+type Order @entity {
+  id: ID!
+  orderId: BigInt!
+  shop: Shop!
+  customer: Customer!
+  totalAmount: BigInt!
+  status: String!
+  createdAt: BigInt!
+  items: [OrderItem!]! @derivedFrom(field: "order")
+}
+
+type OrderItem @entity {
+  id: ID!
+  order: Order!
+  product: Product!
+  variant: Variant
+  quantity: BigInt!
+}
+
+type Customer @entity {
+  id: ID!
+  address: Bytes!
+  orders: [Order!]! @derivedFrom(field: "customer")
+  reviews: [Review!]! @derivedFrom(field: "customer")
+}
+
+type Employee @entity {
+  id: ID!
+  address: Bytes!
+  shop: Shop!
+  role: Bytes!
+  active: Boolean!
+}
+
+type Review @entity {
+  id: ID!
+  reviewId: BigInt!
+  shop: Shop!
+  order: Order!
+  customer: Customer!
+  rating: Int!
+  metadataURI: String!
+  createdAt: BigInt!
+}
+
+type Discount @entity {
+  id: ID!
+  discountId: BigInt!
+  shop: Shop!
+  code: Bytes!
+  basisPoints: BigInt!
+  maxUses: BigInt!
+  usedCount: BigInt!
+  expiresAt: BigInt!
+  active: Boolean!
+}

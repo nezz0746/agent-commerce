@@ -1,4 +1,4 @@
-import { BigInt } from "@graphprotocol/graph-ts";
+import { BigInt, Bytes } from "@graphprotocol/graph-ts";
 import { ShopCreated, ProtocolFeeUpdated } from "../../generated/CommerceHub/CommerceHub";
 import { Shop as ShopTemplate } from "../../generated/templates";
 import { Protocol, Shop } from "../../generated/schema";
@@ -9,7 +9,7 @@ function getOrCreateProtocol(hubAddress: string): Protocol {
   let protocol = Protocol.load(PROTOCOL_ID);
   if (protocol == null) {
     protocol = new Protocol(PROTOCOL_ID);
-    protocol.hub = changetype<Bytes>(hubAddress);
+    protocol.hub = Bytes.fromHexString(hubAddress);
     protocol.protocolFee = BigInt.fromI32(0);
     protocol.shopCount = BigInt.fromI32(0);
   }

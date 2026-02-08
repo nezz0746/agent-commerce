@@ -1,6 +1,6 @@
 specVersion: 0.0.5
 schema:
-  file: ./schema.graphql
+  file: schema.graphql
 dataSources:
   - kind: ethereum
     name: CommerceHub
@@ -17,13 +17,13 @@ dataSources:
         - Shop
       abis:
         - name: CommerceHub
-          file: ../../apps/contracts/out/CommerceHub.sol/CommerceHub.json
+          file: ../apps/contracts/out/CommerceHub.sol/CommerceHub.json
       eventHandlers:
         - event: ShopCreated(indexed address,indexed address,string,string)
           handler: handleShopCreated
         - event: ProtocolFeeUpdated(uint256,uint256)
           handler: handleProtocolFeeUpdated
-      file: ./src/mappings/commerceHub.ts
+      file: CommerceHub/CommerceHub.wasm
 templates:
   - kind: ethereum
     name: Shop
@@ -46,7 +46,7 @@ templates:
         - Discount
       abis:
         - name: Shop
-          file: ../../apps/contracts/out/Shop.sol/Shop.json
+          file: ../apps/contracts/out/Shop.sol/Shop.json
       eventHandlers:
         - event: ProductCreated(indexed uint256,string,uint256,uint256,uint256)
           handler: handleProductCreated
@@ -82,4 +82,4 @@ templates:
           handler: handleDiscountUsed
         - event: PaymentSplitUpdated(indexed address)
           handler: handlePaymentSplitUpdated
-      file: ./src/mappings/shop.ts
+      file: templates/Shop/Shop.wasm
