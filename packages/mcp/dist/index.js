@@ -359,6 +359,109 @@ var shopAbi = [
       { name: "expiresAt", type: "uint256", indexed: false }
     ],
     anonymous: false
+  },
+  {
+    type: "function",
+    name: "deliverDigital",
+    inputs: [
+      { name: "orderId", type: "uint256" },
+      { name: "payload", type: "bytes" }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "getDelivery",
+    inputs: [{ name: "orderId", type: "uint256" }],
+    outputs: [{ name: "", type: "bytes" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "leaveFeedback",
+    inputs: [
+      { name: "orderId", type: "uint256" },
+      { name: "value", type: "int128" },
+      { name: "valueDecimals", type: "uint8" },
+      { name: "tag1", type: "string" },
+      { name: "feedbackURI", type: "string" }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "event",
+    name: "DigitalDelivery",
+    inputs: [
+      { name: "orderId", type: "uint256", indexed: true },
+      { name: "payload", type: "bytes", indexed: false }
+    ]
+  },
+  {
+    type: "event",
+    name: "FeedbackLeft",
+    inputs: [
+      { name: "orderId", type: "uint256", indexed: true },
+      { name: "customer", type: "address", indexed: true },
+      { name: "agentId", type: "uint256", indexed: true },
+      { name: "value", type: "int128", indexed: false }
+    ]
+  },
+  // Escrow
+  {
+    type: "function",
+    name: "claimRefund",
+    inputs: [{ name: "orderId", type: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "setEscrowTimeout",
+    inputs: [{ name: "_timeout", type: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "escrowTimeout",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "orders",
+    inputs: [{ name: "", type: "uint256" }],
+    outputs: [
+      { name: "customer", type: "address" },
+      { name: "totalAmount", type: "uint256" },
+      { name: "protocolFeeAmount", type: "uint256" },
+      { name: "escrowAmount", type: "uint256" },
+      { name: "status", type: "uint8" },
+      { name: "createdAt", type: "uint256" },
+      { name: "shippingHash", type: "bytes32" }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "event",
+    name: "RefundClaimed",
+    inputs: [
+      { name: "orderId", type: "uint256", indexed: true },
+      { name: "customer", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false }
+    ],
+    anonymous: false
+  },
+  {
+    type: "event",
+    name: "EscrowTimeoutUpdated",
+    inputs: [
+      { name: "newTimeout", type: "uint256", indexed: false }
+    ],
+    anonymous: false
   }
 ];
 
@@ -535,41 +638,29 @@ function registerWriteTools(server2) {
     }
   );
   server2.tool(
-    "leave_review",
-    "Leave a review for a fulfilled order (rating 1-5)",
+    "leave_feedback",
+    "Leave feedback for a fulfilled order via ERC-8004 Reputation Registry",
     {
       shopAddress: z2.string().describe("Shop contract address"),
-      orderId: z2.string().describe("Order ID to review"),
-      rating: z2.number().int().min(1).max(5).describe("Rating from 1 to 5"),
-      text: z2.string().describe("Review text (stored as metadataURI)")
+      orderId: z2.string().describe("Order ID to leave feedback for"),
+      value: z2.number().int().describe("Feedback value (e.g. 1-5)"),
+      valueDecimals: z2.number().int().default(0).describe("Decimal places for value"),
+      tag1: z2.string().default("quality").describe("Feedback category (quality, delivery, accuracy)"),
+      feedbackURI: z2.string().default("").describe("URI to detailed feedback")
     },
-    async ({ shopAddress, orderId, rating, text }) => {
+    async ({ shopAddress, orderId, value, valueDecimals, tag1, feedbackURI }) => {
       const walletClient = getWalletClient();
       const publicClient = getPublicClient();
       const account = getAccount();
       const hash = await walletClient.writeContract({
         address: shopAddress,
         abi: shopAbi,
-        functionName: "leaveReview",
-        args: [BigInt(orderId), rating, text],
+        functionName: "leaveFeedback",
+        args: [BigInt(orderId), BigInt(value), valueDecimals, tag1, feedbackURI],
         account,
         chain: walletClient.chain
       });
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
-      let reviewId;
-      for (const log of receipt.logs) {
-        try {
-          const event = decodeEventLog({
-            abi: shopAbi,
-            data: log.data,
-            topics: log.topics
-          });
-          if (event.eventName === "ReviewCreated") {
-            reviewId = event.args.reviewId.toString();
-          }
-        } catch {
-        }
-      }
       return {
         content: [
           {
@@ -577,7 +668,7 @@ function registerWriteTools(server2) {
             text: JSON.stringify({
               success: true,
               txHash: hash,
-              reviewId,
+              orderId,
               blockNumber: receipt.blockNumber.toString()
             }, null, 2)
           }
@@ -841,6 +932,485 @@ function registerAdminTools(server2) {
   );
 }
 
+// src/tools/erc8004.ts
+import { z as z4 } from "zod";
+import { decodeEventLog as decodeEventLog3, keccak256, toBytes } from "viem";
+
+// src/abis/IdentityRegistry.ts
+var identityRegistryAbi = [
+  {
+    type: "function",
+    name: "register",
+    inputs: [{ name: "agentURI", type: "string" }],
+    outputs: [{ name: "agentId", type: "uint256" }],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "ownerOf",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "tokenURI",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ name: "", type: "string" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "setAgentURI",
+    inputs: [
+      { name: "agentId", type: "uint256" },
+      { name: "newURI", type: "string" }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "getMetadata",
+    inputs: [
+      { name: "agentId", type: "uint256" },
+      { name: "metadataKey", type: "string" }
+    ],
+    outputs: [{ name: "", type: "bytes" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "getAgentWallet",
+    inputs: [{ name: "agentId", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view"
+  },
+  {
+    type: "event",
+    name: "Registered",
+    inputs: [
+      { name: "agentId", type: "uint256", indexed: true },
+      { name: "owner", type: "address", indexed: true },
+      { name: "agentURI", type: "string", indexed: false }
+    ]
+  }
+];
+
+// src/abis/ReputationRegistry.ts
+var reputationRegistryAbi = [
+  {
+    type: "function",
+    name: "giveFeedback",
+    inputs: [
+      { name: "agentId", type: "uint256" },
+      { name: "value", type: "int128" },
+      { name: "valueDecimals", type: "uint8" },
+      { name: "tag1", type: "string" },
+      { name: "tag2", type: "string" },
+      { name: "endpoint", type: "string" },
+      { name: "feedbackURI", type: "string" },
+      { name: "feedbackHash", type: "bytes32" }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "getSummary",
+    inputs: [
+      { name: "agentId", type: "uint256" },
+      { name: "clientAddresses", type: "address[]" },
+      { name: "tag1", type: "string" },
+      { name: "tag2", type: "string" }
+    ],
+    outputs: [
+      { name: "count", type: "uint256" },
+      { name: "summaryValue", type: "int256" },
+      { name: "summaryValueDecimals", type: "uint8" }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "getClients",
+    inputs: [{ name: "agentId", type: "uint256" }],
+    outputs: [{ name: "", type: "address[]" }],
+    stateMutability: "view"
+  },
+  {
+    type: "event",
+    name: "NewFeedback",
+    inputs: [
+      { name: "agentId", type: "uint256", indexed: true },
+      { name: "clientAddress", type: "address", indexed: true },
+      { name: "feedbackIndex", type: "uint64", indexed: false },
+      { name: "value", type: "int128", indexed: false },
+      { name: "valueDecimals", type: "uint8", indexed: false },
+      { name: "tag1", type: "string", indexed: false },
+      { name: "tag2", type: "string", indexed: false }
+    ]
+  }
+];
+
+// src/abis/ValidationRegistry.ts
+var validationRegistryAbi = [
+  {
+    type: "function",
+    name: "validationRequest",
+    inputs: [
+      { name: "validatorAddress", type: "address" },
+      { name: "agentId", type: "uint256" },
+      { name: "requestURI", type: "string" },
+      { name: "requestHash", type: "bytes32" }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "getValidationStatus",
+    inputs: [{ name: "requestHash", type: "bytes32" }],
+    outputs: [
+      { name: "validatorAddress", type: "address" },
+      { name: "agentId", type: "uint256" },
+      { name: "response", type: "uint8" },
+      { name: "responseHash", type: "bytes32" },
+      { name: "tag", type: "string" },
+      { name: "lastUpdate", type: "uint256" }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "event",
+    name: "ValidationRequested",
+    inputs: [
+      { name: "requestHash", type: "bytes32", indexed: true },
+      { name: "agentId", type: "uint256", indexed: true },
+      { name: "validatorAddress", type: "address", indexed: true },
+      { name: "requestURI", type: "string", indexed: false }
+    ]
+  }
+];
+
+// src/tools/erc8004.ts
+function getRegistryAddresses() {
+  return {
+    identityRegistry: process.env.COMMERCE_IDENTITY_REGISTRY || "0x0000000000000000000000000000000000000000",
+    reputationRegistry: process.env.COMMERCE_REPUTATION_REGISTRY || "0x0000000000000000000000000000000000000000",
+    validationRegistry: process.env.COMMERCE_VALIDATION_REGISTRY || "0x0000000000000000000000000000000000000000"
+  };
+}
+function registerERC8004Tools(server2) {
+  server2.tool(
+    "register_agent",
+    "Register as an agent in the ERC-8004 Identity Registry",
+    {
+      agentURI: z4.string().describe("Agent URI (e.g. IPFS link to registration file)")
+    },
+    async ({ agentURI }) => {
+      const walletClient = getWalletClient();
+      const publicClient = getPublicClient();
+      const account = getAccount();
+      const { identityRegistry } = getRegistryAddresses();
+      const hash = await walletClient.writeContract({
+        address: identityRegistry,
+        abi: identityRegistryAbi,
+        functionName: "register",
+        args: [agentURI],
+        account,
+        chain: walletClient.chain
+      });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      let agentId;
+      for (const log of receipt.logs) {
+        try {
+          const event = decodeEventLog3({ abi: identityRegistryAbi, data: log.data, topics: log.topics });
+          if (event.eventName === "Registered") {
+            agentId = event.args.agentId.toString();
+          }
+        } catch {
+        }
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify({ success: true, txHash: hash, agentId, blockNumber: receipt.blockNumber.toString() }, null, 2) }]
+      };
+    }
+  );
+  server2.tool(
+    "get_agent",
+    "Get agent details by agentId from the Identity Registry",
+    {
+      agentId: z4.string().describe("Agent ID")
+    },
+    async ({ agentId }) => {
+      const publicClient = getPublicClient();
+      const { identityRegistry } = getRegistryAddresses();
+      const [owner, tokenURI, wallet] = await Promise.all([
+        publicClient.readContract({ address: identityRegistry, abi: identityRegistryAbi, functionName: "ownerOf", args: [BigInt(agentId)] }),
+        publicClient.readContract({ address: identityRegistry, abi: identityRegistryAbi, functionName: "tokenURI", args: [BigInt(agentId)] }),
+        publicClient.readContract({ address: identityRegistry, abi: identityRegistryAbi, functionName: "getAgentWallet", args: [BigInt(agentId)] })
+      ]);
+      return {
+        content: [{ type: "text", text: JSON.stringify({ agentId, owner, tokenURI, wallet }, null, 2) }]
+      };
+    }
+  );
+  server2.tool(
+    "give_feedback",
+    "Leave feedback for an agent via the ERC-8004 Reputation Registry",
+    {
+      agentId: z4.string().describe("Agent ID to leave feedback for"),
+      value: z4.number().int().describe("Feedback value (e.g. 1-5)"),
+      valueDecimals: z4.number().int().default(0).describe("Decimal places for value"),
+      tag1: z4.string().default("").describe("Primary tag (e.g. quality, delivery)"),
+      tag2: z4.string().default("").describe("Secondary tag"),
+      feedbackURI: z4.string().default("").describe("URI to detailed feedback")
+    },
+    async ({ agentId, value, valueDecimals, tag1, tag2, feedbackURI }) => {
+      const walletClient = getWalletClient();
+      const publicClient = getPublicClient();
+      const account = getAccount();
+      const { reputationRegistry } = getRegistryAddresses();
+      const hash = await walletClient.writeContract({
+        address: reputationRegistry,
+        abi: reputationRegistryAbi,
+        functionName: "giveFeedback",
+        args: [BigInt(agentId), BigInt(value), valueDecimals, tag1, tag2, "", feedbackURI, "0x0000000000000000000000000000000000000000000000000000000000000000"],
+        account,
+        chain: walletClient.chain
+      });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      return {
+        content: [{ type: "text", text: JSON.stringify({ success: true, txHash: hash, blockNumber: receipt.blockNumber.toString() }, null, 2) }]
+      };
+    }
+  );
+  server2.tool(
+    "get_reputation",
+    "Get reputation summary for an agent",
+    {
+      agentId: z4.string().describe("Agent ID"),
+      tag1: z4.string().default("").describe("Filter by primary tag"),
+      tag2: z4.string().default("").describe("Filter by secondary tag")
+    },
+    async ({ agentId, tag1, tag2 }) => {
+      const publicClient = getPublicClient();
+      const { reputationRegistry } = getRegistryAddresses();
+      const [count, summaryValue, summaryValueDecimals] = await publicClient.readContract({
+        address: reputationRegistry,
+        abi: reputationRegistryAbi,
+        functionName: "getSummary",
+        args: [BigInt(agentId), [], tag1, tag2]
+      });
+      const clients = await publicClient.readContract({
+        address: reputationRegistry,
+        abi: reputationRegistryAbi,
+        functionName: "getClients",
+        args: [BigInt(agentId)]
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify({
+          agentId,
+          feedbackCount: count.toString(),
+          summaryValue: summaryValue.toString(),
+          summaryValueDecimals,
+          uniqueClients: clients.length
+        }, null, 2) }]
+      };
+    }
+  );
+  server2.tool(
+    "request_validation",
+    "Request validation of an agent's work",
+    {
+      validatorAddress: z4.string().describe("Validator's address"),
+      agentId: z4.string().describe("Agent ID to validate"),
+      requestURI: z4.string().describe("URI to validation request details")
+    },
+    async ({ validatorAddress, agentId, requestURI }) => {
+      const walletClient = getWalletClient();
+      const publicClient = getPublicClient();
+      const account = getAccount();
+      const { validationRegistry } = getRegistryAddresses();
+      const requestHash = keccak256(toBytes(requestURI + Date.now().toString()));
+      const hash = await walletClient.writeContract({
+        address: validationRegistry,
+        abi: validationRegistryAbi,
+        functionName: "validationRequest",
+        args: [validatorAddress, BigInt(agentId), requestURI, requestHash],
+        account,
+        chain: walletClient.chain
+      });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      return {
+        content: [{ type: "text", text: JSON.stringify({ success: true, txHash: hash, requestHash, blockNumber: receipt.blockNumber.toString() }, null, 2) }]
+      };
+    }
+  );
+  server2.tool(
+    "deliver_digital",
+    "Deliver digital goods for an order",
+    {
+      shopAddress: z4.string().describe("Shop contract address"),
+      orderId: z4.string().describe("Order ID"),
+      payload: z4.string().describe("Digital delivery payload (hex-encoded or plain text)")
+    },
+    async ({ shopAddress, orderId, payload }) => {
+      const walletClient = getWalletClient();
+      const publicClient = getPublicClient();
+      const account = getAccount();
+      const payloadBytes = toBytes(payload);
+      const hash = await walletClient.writeContract({
+        address: shopAddress,
+        abi: shopAbi,
+        functionName: "deliverDigital",
+        args: [BigInt(orderId), payloadBytes],
+        account,
+        chain: walletClient.chain
+      });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      return {
+        content: [{ type: "text", text: JSON.stringify({ success: true, txHash: hash, orderId, blockNumber: receipt.blockNumber.toString() }, null, 2) }]
+      };
+    }
+  );
+}
+
+// src/tools/escrow.ts
+import { z as z5 } from "zod";
+import { formatEther as formatEther3 } from "viem";
+var ORDER_STATUS_LABELS = {
+  0: "Created",
+  1: "Paid",
+  2: "Fulfilled",
+  3: "Completed",
+  4: "Cancelled",
+  5: "Refunded"
+};
+function registerEscrowTools(server2) {
+  server2.tool(
+    "claim_refund",
+    "Claim a refund for an order after the escrow timeout has expired. Only the customer who placed the order can claim.",
+    {
+      shopAddress: z5.string().describe("Shop contract address"),
+      orderId: z5.string().describe("Order ID to claim refund for")
+    },
+    async ({ shopAddress, orderId }) => {
+      const walletClient = getWalletClient();
+      const publicClient = getPublicClient();
+      const account = getAccount();
+      const hash = await walletClient.writeContract({
+        address: shopAddress,
+        abi: shopAbi,
+        functionName: "claimRefund",
+        args: [BigInt(orderId)],
+        account,
+        chain: walletClient.chain
+      });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              success: true,
+              txHash: hash,
+              orderId,
+              blockNumber: receipt.blockNumber.toString()
+            }, null, 2)
+          }
+        ]
+      };
+    }
+  );
+  server2.tool(
+    "set_escrow_timeout",
+    "Set the escrow timeout duration for the shop. Only the shop owner can call this. Minimum is 1 day (86400 seconds).",
+    {
+      shopAddress: z5.string().describe("Shop contract address"),
+      timeoutSeconds: z5.number().int().positive().describe("Escrow timeout in seconds (minimum 86400 = 1 day)")
+    },
+    async ({ shopAddress, timeoutSeconds }) => {
+      const walletClient = getWalletClient();
+      const publicClient = getPublicClient();
+      const account = getAccount();
+      const hash = await walletClient.writeContract({
+        address: shopAddress,
+        abi: shopAbi,
+        functionName: "setEscrowTimeout",
+        args: [BigInt(timeoutSeconds)],
+        account,
+        chain: walletClient.chain
+      });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              success: true,
+              txHash: hash,
+              timeoutSeconds,
+              blockNumber: receipt.blockNumber.toString()
+            }, null, 2)
+          }
+        ]
+      };
+    }
+  );
+  server2.tool(
+    "get_escrow_status",
+    "Get escrow information for an order, including amount held, order status, timestamps, and whether a refund is currently claimable.",
+    {
+      shopAddress: z5.string().describe("Shop contract address"),
+      orderId: z5.string().describe("Order ID to check")
+    },
+    async ({ shopAddress, orderId }) => {
+      const publicClient = getPublicClient();
+      const addr = shopAddress;
+      const [order, timeout] = await Promise.all([
+        publicClient.readContract({
+          address: addr,
+          abi: shopAbi,
+          functionName: "orders",
+          args: [BigInt(orderId)]
+        }),
+        publicClient.readContract({
+          address: addr,
+          abi: shopAbi,
+          functionName: "escrowTimeout"
+        })
+      ]);
+      const [customer, totalAmount, protocolFeeAmount, escrowAmount, status, createdAt, shippingHash] = order;
+      const escrowTimeoutSeconds = timeout;
+      const now = BigInt(Math.floor(Date.now() / 1e3));
+      const expiresAt = createdAt + escrowTimeoutSeconds;
+      const isRefundClaimable = status === 1 && now >= expiresAt && escrowAmount > 0n;
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              orderId,
+              customer,
+              totalAmount: formatEther3(totalAmount) + " ETH",
+              escrowAmount: formatEther3(escrowAmount) + " ETH",
+              protocolFeeAmount: formatEther3(protocolFeeAmount) + " ETH",
+              status: ORDER_STATUS_LABELS[status] ?? `Unknown(${status})`,
+              statusCode: status,
+              createdAt: createdAt.toString(),
+              escrowTimeoutSeconds: escrowTimeoutSeconds.toString(),
+              expiresAt: expiresAt.toString(),
+              isRefundClaimable
+            }, null, 2)
+          }
+        ]
+      };
+    }
+  );
+}
+
 // src/index.ts
 var server = new McpServer({
   name: "onchain-commerce",
@@ -849,6 +1419,8 @@ var server = new McpServer({
 registerReadTools(server);
 registerWriteTools(server);
 registerAdminTools(server);
+registerERC8004Tools(server);
+registerEscrowTools(server);
 var transport = new StdioServerTransport();
 await server.connect(transport);
 //# sourceMappingURL=index.js.map

@@ -5,6 +5,7 @@ import { commerceHubConfig, shopAbi } from "@/lib/contracts";
 import { formatPrice } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { EscrowStatus } from "@/components/EscrowStatus";
+import { ReviewButton } from "@/components/ReviewButton";
 
 const STATUS_LABELS = ["Created", "Paid", "Fulfilled", "Completed", "Cancelled", "Refunded"];
 
@@ -61,6 +62,11 @@ function OrderRow({
         status={status}
         escrowAmount={escrowAmount}
         createdAt={createdAt}
+      />
+      <ReviewButton
+        shopAddress={shopAddress}
+        orderId={orderId}
+        orderStatus={status}
       />
     </div>
   );

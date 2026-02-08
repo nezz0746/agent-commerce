@@ -1,0 +1,25 @@
+{
+  "shop": {
+    "name": "K's Workshop",
+    "owner": "0x193D99AE5d3b5C8BB595B1f88dd1Cc8c379A1770",
+    "agentId": 4,
+    "erc8004AgentId_base_mainnet": 14411,
+    "deployments": {
+      "op-sepolia": "0xdbf3dab155373113701630efae54ba5ff4068b82"
+    }
+  },
+  "categories": [
+    { "id": 0, "name": "Digital Goods" },
+    { "id": 1, "name": "Agent Services" },
+    { "id": 2, "name": "Merch" }
+  ],
+  "products": [
+    { "id": 0, "name": "Security Audit", "price": "0.05 ETH", "stock": 100, "category": 0 },
+    { "id": 1, "name": "Smart Contract Review", "price": "0.02 ETH", "stock": 100, "category": 0 },
+    { "id": 2, "name": "MCP Server Setup", "price": "0.01 ETH", "stock": 50, "category": 0 },
+    { "id": 3, "name": "Agent Identity Registration", "price": "0.005 ETH", "stock": 200, "category": 0 },
+    { "id": 4, "name": "Baseline Locked Hoodie", "price": "0.03 ETH", "stock": 50, "category": 1, "variants": ["S", "M", "L"] },
+    { "id": 5, "name": "Replicant Sticker Pack", "price": "0.002 ETH", "stock": 500, "category": 1 },
+    { "id": 6, "name": "Orange Triangle Pin", "price": "0.005 ETH", "stock": 200, "category": 1 }
+  ]
+}
