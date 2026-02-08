@@ -1,116 +1,123 @@
-# Onchain Commerce
+# Onchain Commerce Protocol
 
-A fully onchain multi-tenant e-commerce protocol on Optimism.
+Fully onchain multi-tenant e-commerce protocol on Optimism. Create shops, list products, process orders, collect reviews — all onchain with protocol fees and [0xSplits](https://splits.org) integration.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│                  CommerceHub                     │
-│  (Protocol singleton — deploys shops via clones) │
-│                                                   │
-│  • protocolFee (basis points)                     │
-│  • protocolFeeRecipient                           │
-│  • Shop registry                                  │
-│  • createShop() → ERC-1167 minimal proxy          │
-└───────────┬─────────────┬─────────────┬──────────┘
-            │             │             │
-     ┌──────▼──┐   ┌──────▼──┐   ┌──────▼──┐
-     │  Shop A  │   │  Shop B  │   │  Shop C  │
-     │ (clone)  │   │ (clone)  │   │ (clone)  │
-     └──────────┘   └──────────┘   └──────────┘
-
-Each Shop manages:
-  • Products (with variants)
-  • Categories & Collections
-  • Orders (create → pay → fulfill → complete)
-  • Discounts / Coupons
-  • Reviews (verified purchase)
-  • Employee roles (Owner / Manager / Employee)
-  • Payment splits (0xSplits integration)
+┌─────────────────────────────────────────────────────┐
+│                   CommerceHub                       │
+│                (Factory Contract)                    │
+│         Creates shop clones via ERC-1167            │
+└──────────┬──────────┬──────────┬────────────────────┘
+           │          │          │
+     ┌─────▼──┐ ┌────▼───┐ ┌───▼────┐
+     │  Shop  │ │  Shop  │ │  Shop  │   ← Minimal proxy clones
+     └───┬────┘ └───┬────┘ └───┬────┘
+         │          │          │
+    ┌────┴────────┐ │    ┌─────┴──────┐
+    │ Products    │ │    │ Products   │
+    │ Orders      │ │    │ Orders     │
+    │ Reviews     │ │    │ Reviews    │
+    │ Discounts   │ │    │ Discounts  │
+    │ Categories  │ │    │ Categories │
+    └─────────────┘ │    └────────────┘
+                    ...
 ```
 
-## Entity Relationships
+Each shop is an ERC-1167 minimal proxy clone deployed by `CommerceHub`. Shops manage their own products, orders, reviews, and discount codes independently while protocol fees flow back to the hub.
+
+## Deployed Contracts (OP Sepolia)
+
+| Contract | Address |
+|----------|---------|
+| **CommerceHub** | `0x479bcD43394867983d7dAE0b7280c251dFa0b935` |
+| Astro Merch (shop) | `0x91674D02F80445079f1C5C576964F76ABf583379` |
+| Onchain Coffee (shop) | `0x939BCe9559157Dfe60439F0dC62c942D84f7e209` |
+| K's Workshop (shop) | `0x6591f0c9f7eb32c2014a8a90fe43f3ffda11df5a` |
+
+**Subgraph:** [`https://api.studio.thegraph.com/query/958/onchain-commerce/v0.0.1`](https://api.studio.thegraph.com/query/958/onchain-commerce/v0.0.1)
+
+**Frontend:** [`https://web-calm7uqky-adland.vercel.app`](https://web-calm7uqky-adland.vercel.app)
+
+## Key Features
+
+- **Multi-tenant shops** — Anyone can create a shop via CommerceHub
+- **ERC-1167 clones** — Gas-efficient shop deployment using minimal proxies
+- **Role-based access** — Owner, manager, and employee roles per shop
+- **Product variants** — Products support multiple variants with independent pricing/stock
+- **Collections & categories** — Organize products into categories and collections
+- **Order lifecycle** — Create → Fulfill → Complete (or Cancel) with on-chain state tracking
+- **Verified reviews** — Only customers with fulfilled orders can leave reviews
+- **Discount codes** — Percentage-based discounts with usage limits and expiry
+- **Payment splits** — 0xSplits integration for revenue sharing
+- **Protocol fees** — Configurable fee collected on every order
+
+## Monorepo Structure
 
 ```
-Shop 1──* Product 1──* Variant
-Shop 1──* Category 1──* Product
-Shop 1──* Collection *──* Product
-Shop 1──* Order 1──* OrderItem ──1 Product/Variant
-Shop 1──* Employee
-Shop 1──* Discount
-Order 1──? Review
-Customer 1──* Order
-Customer 1──* Review
+onchain-commerce/
+├── apps/
+│   ├── contracts/       # Foundry smart contracts (Solidity)
+│   └── web/             # Next.js 16 frontend
+├── packages/
+│   ├── subgraph/        # The Graph subgraph (indexing)
+│   └── mcp/             # MCP server for AI agent interaction
 ```
 
-## Contracts
+## Quick Start
 
-| Contract | Description |
-|----------|-------------|
-| `CommerceHub.sol` | Protocol singleton, shop factory (ERC-1167 clones) |
-| `Shop.sol` | Per-shop contract with products, orders, reviews, discounts, roles |
-| `ICommerceHub.sol` | Interface for hub fee queries |
+### Prerequisites
 
-## Order Lifecycle
+- [Foundry](https://book.getfoundry.sh/getting-started/installation)
+- Node.js ≥ 18
+- pnpm
 
-```
-Customer pays ETH → Order created (Paid)
-  → Protocol fee sent to protocolFeeRecipient
-  → Shop revenue sent to paymentSplitAddress (or owner)
-  → Shop fulfills → Fulfilled
-  → Customer can review (verified purchase)
-
-Cancellation: Customer cancels before fulfillment → refunded (minus protocol fee)
-Refund: Shop initiates refund → refunded (minus protocol fee)
-```
-
-## Roles (per Shop)
-
-- **OWNER_ROLE**: Full control, assigns roles, sets payment split
-- **MANAGER_ROLE**: Manage products/categories/collections, fulfill orders, manage discounts
-- **EMPLOYEE_ROLE**: Fulfill orders, update shipping
-
-## Development
+### Deploy Contracts
 
 ```bash
 cd apps/contracts
-
-# Build
+cp .env.example .env   # Set RPC_URL, PRIVATE_KEY, ETHERSCAN_API_KEY
 forge build
-
-# Test
-forge test -vv
-
-# Deploy (set env vars first)
-forge script script/Deploy.s.sol --rpc-url $OPTIMISM_RPC_URL --broadcast
+forge script script/Deploy.s.sol --rpc-url $RPC_URL --broadcast --verify
 ```
 
-### Environment Variables
+### Seed Data
 
-```
-PRIVATE_KEY=
-OPTIMISM_RPC_URL=
-PROTOCOL_FEE_RECIPIENT=
-PROTOCOL_FEE_BPS=250
-ETHERSCAN_API_KEY=
+```bash
+forge script script/Seed.s.sol --rpc-url $RPC_URL --broadcast
 ```
 
-## Subgraph
+### Run Frontend
 
-The `packages/subgraph` directory contains a Graph Protocol subgraph for indexing all protocol events on Optimism.
+```bash
+cd apps/web
+cp .env.example .env.local   # Set NEXT_PUBLIC_* vars
+pnpm install
+pnpm dev
+```
+
+### Run Subgraph
 
 ```bash
 cd packages/subgraph
-npm install
-npm run codegen
-npm run build
+pnpm install
+pnpm codegen
+pnpm build
+pnpm deploy
 ```
 
-## Tech Stack
+### Run MCP Server
 
-- Solidity ^0.8.24
-- Foundry
-- OpenZeppelin (Clones, AccessControl, Pausable)
-- The Graph (subgraph indexing)
-- Target: Optimism (chain ID 10)
+```bash
+cd packages/mcp
+pnpm install
+pnpm build
+pnpm start
+```
+
+See [`packages/mcp/README.md`](packages/mcp/README.md) for AI agent integration details.
+
+## License
+
+MIT
