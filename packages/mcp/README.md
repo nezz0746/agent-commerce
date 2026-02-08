@@ -2,7 +2,7 @@
 
 MCP ([Model Context Protocol](https://modelcontextprotocol.io)) server that lets AI agents interact with the Onchain Commerce protocol. Browse shops, purchase products, manage inventory — all through natural language.
 
-## Available Tools
+## Available Tools (22 total)
 
 ### Read (Subgraph queries)
 
@@ -32,6 +32,25 @@ MCP ([Model Context Protocol](https://modelcontextprotocol.io)) server that lets
 | `fulfill_order` | Mark an order as fulfilled (owner/manager only) |
 | `create_discount` | Create a discount code with basis points, max uses, and expiry |
 
+### ERC-8004 (Identity & Reputation)
+
+| Tool | Description |
+|------|-------------|
+| `register_agent` | Register an address as an ERC-8004 agent in the IdentityRegistry |
+| `get_agent` | Get agent identity details by token ID |
+| `get_agent_by_owner` | Look up an agent by owner address |
+| `give_feedback` | Submit feedback to the ReputationRegistry (starred ratings 0-100) |
+| `get_feedback` | Get feedback entries for an agent |
+| `get_agent_reputation` | Get aggregated reputation score for an agent |
+
+### Escrow
+
+| Tool | Description |
+|------|-------------|
+| `claim_refund` | Claim a refund for an unfulfilled order after escrow timeout |
+| `set_escrow_timeout` | Set the escrow timeout duration for a shop (owner only) |
+| `get_escrow_status` | Check escrow status and refund eligibility for an order |
+
 ## Configuration
 
 Set the following environment variables:
@@ -40,8 +59,8 @@ Set the following environment variables:
 |----------|-------------|---------|
 | `COMMERCE_RPC_URL` | OP Sepolia RPC endpoint | `https://sepolia.optimism.io` |
 | `COMMERCE_PRIVATE_KEY` | Wallet private key for write operations | `0xabc...` |
-| `COMMERCE_HUB_ADDRESS` | CommerceHub contract address | `0x479bcD43394867983d7dAE0b7280c251dFa0b935` |
-| `COMMERCE_SUBGRAPH_URL` | Subgraph GraphQL endpoint | `https://api.studio.thegraph.com/query/958/onchain-commerce/v0.0.1` |
+| `COMMERCE_HUB_ADDRESS` | CommerceHub contract address | `0xb16e5DF039FD6Ed176fbcCF53fEcC890219EC718` |
+| `COMMERCE_SUBGRAPH_URL` | Subgraph GraphQL endpoint | `https://api.studio.thegraph.com/query/958/onchain-commerce/v0.0.3` |
 
 ## Usage with Claude / MCP Clients
 
@@ -56,8 +75,8 @@ Add to your MCP client config (e.g. `claude_desktop_config.json`):
       "env": {
         "COMMERCE_RPC_URL": "https://sepolia.optimism.io",
         "COMMERCE_PRIVATE_KEY": "0x...",
-        "COMMERCE_HUB_ADDRESS": "0x479bcD43394867983d7dAE0b7280c251dFa0b935",
-        "COMMERCE_SUBGRAPH_URL": "https://api.studio.thegraph.com/query/958/onchain-commerce/v0.0.1"
+        "COMMERCE_HUB_ADDRESS": "0xb16e5DF039FD6Ed176fbcCF53fEcC890219EC718",
+        "COMMERCE_SUBGRAPH_URL": "https://api.studio.thegraph.com/query/958/onchain-commerce/v0.0.3"
       }
     }
   }

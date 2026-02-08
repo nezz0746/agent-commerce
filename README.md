@@ -5,24 +5,30 @@ Fully onchain multi-tenant e-commerce protocol on Optimism. Create shops, list p
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   CommerceHub                       │
-│                (Factory Contract)                    │
-│         Creates shop clones via ERC-1167            │
-└──────────┬──────────┬──────────┬────────────────────┘
-           │          │          │
-     ┌─────▼──┐ ┌────▼───┐ ┌───▼────┐
-     │  Shop  │ │  Shop  │ │  Shop  │   ← Minimal proxy clones
-     └───┬────┘ └───┬────┘ └───┬────┘
-         │          │          │
-    ┌────┴────────┐ │    ┌─────┴──────┐
-    │ Products    │ │    │ Products   │
-    │ Orders      │ │    │ Orders     │
-    │ Reviews     │ │    │ Reviews    │
-    │ Discounts   │ │    │ Discounts  │
-    │ Categories  │ │    │ Categories │
-    └─────────────┘ │    └────────────┘
-                    ...
+┌──────────────────────────────────────────────────────────────────┐
+│                         CommerceHub                              │
+│                      (Factory Contract)                          │
+│               Creates shop clones via ERC-1167                   │
+└──────┬──────────┬──────────┬─────────────────────────────────────┘
+       │          │          │
+ ┌─────▼──┐ ┌────▼───┐ ┌───▼────┐
+ │  Shop  │ │  Shop  │ │  Shop  │   ← Minimal proxy clones
+ └───┬────┘ └───┬────┘ └───┬────┘
+     │          │          │
+┌────┴────────┐ │    ┌─────┴──────┐
+│ Products    │ │    │ Products   │
+│ Orders      │ │    │ Orders     │
+│ Reviews     │ │    │ Reviews    │
+│ Discounts   │ │    │ Discounts  │
+│ Categories  │ │    │ Categories │
+└─────────────┘ │    └────────────┘
+                ...
+
+┌────────────────────┐   ┌─────────────────────┐
+│ IdentityRegistry   │   │ ReputationRegistry  │
+│ (ERC-8004)         │   │ (ERC-8004)          │
+│ Agent NFTs & gating│   │ Feedback & ratings  │
+└────────────────────┘   └─────────────────────┘
 ```
 
 Each shop is an ERC-1167 minimal proxy clone deployed by `CommerceHub`. Shops manage their own products, orders, reviews, and discount codes independently while protocol fees flow back to the hub.
@@ -38,8 +44,9 @@ Each shop is an ERC-1167 minimal proxy clone deployed by `CommerceHub`. Shops ma
 | **Shop Implementation** | `0x3186c203dFDEf953D9518Ebe91c544a42A3b9d21` |
 | Astro Merch (shop) | `0x99A5f9Ea2424dcB8be7406F2151be0a417ffe15B` |
 | Onchain Coffee (shop) | `0x410F81215E80EcCcB25F2B58702A98d5A87F5a0a` |
+| K's Workshop (shop) | `0xdbf3dab155373113701630efae54ba5ff4068b82` |
 
-**Subgraph:** [`https://api.studio.thegraph.com/query/958/onchain-commerce/v0.0.2`](https://api.studio.thegraph.com/query/958/onchain-commerce/v0.0.2)
+**Subgraph:** [`https://api.studio.thegraph.com/query/958/onchain-commerce/v0.0.3`](https://api.studio.thegraph.com/query/958/onchain-commerce/v0.0.3)
 
 **Frontend:** [`https://web-calm7uqky-adland.vercel.app`](https://web-calm7uqky-adland.vercel.app)
 
@@ -50,6 +57,14 @@ Shop creation is gated behind [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004
 - **Base Mainnet Registry:** `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`
 - The registry address is configurable via `setIdentityRegistry()` (onlyOwner) for multi-chain deployments
 - Each shop also gets registered as an agent in the registry, with the NFT transferred to the shop owner
+
+## Escrow
+
+All orders use an escrow mechanism — funds are held by the shop contract until the order is fulfilled. If the seller doesn't fulfill within a configurable timeout (default: **7 days**), the customer can call `claimRefund()` to reclaim their funds automatically. Shop owners can adjust the escrow timeout via `setEscrowTimeout()`.
+
+## Reputation (ERC-8004)
+
+After an order is fulfilled, customers can call `leaveFeedback()` which writes to the **ReputationRegistry** (ERC-8004). Feedback is tagged with `starred` for star ratings, where the score (0–100) maps to a 1–5 star scale. This builds an onchain reputation for shops that any protocol or frontend can read.
 
 ## Key Features
 
@@ -64,6 +79,8 @@ Shop creation is gated behind [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004
 - **Discount codes** — Percentage-based discounts with usage limits and expiry
 - **Payment splits** — 0xSplits integration for revenue sharing
 - **Protocol fees** — Configurable fee collected on every order
+- **Escrow** — Funds held until fulfillment, auto-refundable after timeout
+- **Onchain reputation** — `leaveFeedback()` writes star ratings to ERC-8004 ReputationRegistry
 
 ## Monorepo Structure
 
@@ -71,7 +88,7 @@ Shop creation is gated behind [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004
 onchain-commerce/
 ├── apps/
 │   ├── contracts/       # Foundry smart contracts (Solidity)
-│   └── web/             # Next.js 16 frontend
+│   └── web/             # Next.js 16 frontend (react-query + wagmi)
 ├── packages/
 │   ├── subgraph/        # The Graph subgraph (indexing)
 │   └── mcp/             # MCP server for AI agent interaction
