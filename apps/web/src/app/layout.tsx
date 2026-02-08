@@ -1,10 +1,16 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { DM_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
+import { AppSidebar } from "@/components/AppSidebar";
 import { Header } from "@/components/Header";
+import { SidebarInset } from "@/components/ui/sidebar";
+import { Toaster } from "sonner";
 
-const inter = Inter({ subsets: ["latin"] });
+const font = DM_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
 
 export const metadata: Metadata = {
   title: "Onchain Commerce",
@@ -17,12 +23,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.className} bg-zinc-950 text-zinc-100 min-h-screen`}>
+    <html lang="en">
+      <body className={`${font.className} min-h-screen antialiased`}>
         <Providers>
-          <Header />
-          <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
+          <AppSidebar />
+          <SidebarInset>
+            <Header />
+            <main className="flex-1 p-6">{children}</main>
+          </SidebarInset>
         </Providers>
+        <Toaster theme="light" richColors position="bottom-right" />
       </body>
     </html>
   );

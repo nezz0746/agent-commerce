@@ -1,26 +1,29 @@
 "use client";
 
 import { useAccount, useReadContract } from "wagmi";
-import { shopAbi, commerceHubConfig } from "@/lib/contracts";
-import { formatPrice, shortenAddress } from "@/lib/utils";
-import { useState } from "react";
+import { commerceHubConfig, shopAbi } from "@/lib/contracts";
+import { formatPrice } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Calendar,
+  CheckCircle2,
+  CircleDot,
+  Clock,
+  Package,
+  RefreshCcw,
+  Store,
+  Wallet,
+  XCircle,
+} from "lucide-react";
 
-const STATUS_LABELS = [
-  "Created",
-  "Paid",
-  "Fulfilled",
-  "Completed",
-  "Cancelled",
-  "Refunded",
-];
-
-const STATUS_COLORS = [
-  "text-zinc-400",
-  "text-yellow-400",
-  "text-blue-400",
-  "text-green-400",
-  "text-red-400",
-  "text-orange-400",
+const STATUS_CONFIG = [
+  { label: "Created", icon: CircleDot, variant: "secondary" as const },
+  { label: "Paid", icon: Clock, variant: "default" as const },
+  { label: "Fulfilled", icon: Package, variant: "default" as const },
+  { label: "Completed", icon: CheckCircle2, variant: "secondary" as const },
+  { label: "Cancelled", icon: XCircle, variant: "destructive" as const },
+  { label: "Refunded", icon: RefreshCcw, variant: "outline" as const },
 ];
 
 function OrderRow({
@@ -51,19 +54,26 @@ function OrderRow({
 
   if (customer.toLowerCase() !== address?.toLowerCase()) return null;
 
+  const config = STATUS_CONFIG[status];
+  const StatusIcon = config.icon;
+
   return (
-    <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-      <div>
+    <div className="flex items-center justify-between rounded-lg border p-4">
+      <div className="space-y-1">
         <p className="font-medium">Order #{orderId}</p>
-        <p className="text-sm text-zinc-500">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Calendar className="h-3 w-3" />
           {new Date(Number(createdAt) * 1000).toLocaleDateString()}
-        </p>
+        </div>
       </div>
-      <div className="text-right">
-        <p className="text-sm font-medium">{formatPrice(totalAmount)}</p>
-        <p className={`text-xs ${STATUS_COLORS[status]}`}>
-          {STATUS_LABELS[status]}
-        </p>
+      <div className="flex items-center gap-3">
+        <span className="text-sm font-medium tabular-nums">
+          {formatPrice(totalAmount)}
+        </span>
+        <Badge variant={config.variant} className="gap-1">
+          <StatusIcon className="h-3 w-3" />
+          {config.label}
+        </Badge>
       </div>
     </div>
   );
@@ -86,14 +96,19 @@ function ShopOrders({ shopAddress }: { shopAddress: `0x${string}` }) {
   if (orderCount === 0) return null;
 
   return (
-    <div className="mb-6">
-      <h3 className="text-lg font-semibold mb-3">{name as string}</h3>
-      <div className="space-y-2">
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-2">
+          <Store className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-base">{name as string}</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2">
         {Array.from({ length: orderCount }, (_, i) => (
           <OrderRow key={i + 1} shopAddress={shopAddress} orderId={i + 1} />
         ))}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -107,22 +122,40 @@ export default function OrdersPage() {
 
   if (!isConnected) {
     return (
-      <div>
-        <h1 className="text-2xl font-bold mb-4">Orders</h1>
-        <p className="text-zinc-500">Connect your wallet to view orders.</p>
+      <div className="mx-auto max-w-2xl">
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+              <Wallet className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <h3 className="mt-4 font-semibold">Connect your wallet</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Connect your wallet to view your order history.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-6">My Orders</h1>
+    <div className="mx-auto max-w-2xl space-y-6">
       {shops && (shops as `0x${string}`[]).length > 0 ? (
         (shops as `0x${string}`[]).map((addr) => (
           <ShopOrders key={addr} shopAddress={addr} />
         ))
       ) : (
-        <p className="text-zinc-500">No shops found.</p>
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+              <Package className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <h3 className="mt-4 font-semibold">No orders yet</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Your order history will appear here.
+            </p>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

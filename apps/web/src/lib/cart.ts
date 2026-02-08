@@ -1,8 +1,5 @@
 "use client";
 
-import { create } from "zustand";
-
-// We'll use a simple React context instead of zustand to avoid extra deps
 
 export interface CartItem {
   shopAddress: `0x${string}`;

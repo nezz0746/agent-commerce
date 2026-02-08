@@ -1,11 +1,21 @@
 "use client";
 
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useReadContract } from "wagmi";
 import { shopAbi } from "@/lib/contracts";
 import { formatPrice } from "@/lib/utils";
 import { addToCart } from "@/lib/cart";
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Check, Minus, Package, Plus, ShoppingBag, ShoppingCart } from "lucide-react";
+import { toast } from "sonner";
+import Link from "next/link";
+import { useProductMetadata } from "@/hooks/use-product-metadata";
+import Image from "next/image";
 
 function VariantSelector({
   shopAddress,
@@ -61,16 +71,15 @@ function VariantButton({
   if (!active) return null;
 
   return (
-    <button
+    <Button
+      variant={isSelected ? "default" : "outline"}
+      size="sm"
       onClick={onSelect}
-      className={`rounded-lg border px-4 py-2 text-sm transition ${
-        isSelected
-          ? "border-blue-500 bg-blue-500/10 text-blue-400"
-          : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
-      }`}
+      className={isSelected ? "" : "text-muted-foreground"}
     >
+      {isSelected && <Check className="h-3 w-3" />}
       {name}
-    </button>
+    </Button>
   );
 }
 
@@ -79,7 +88,7 @@ export default function ProductPage() {
   const shopAddress = params.address as `0x${string}`;
   const productId = Number(params.id);
   const [selectedVariant, setSelectedVariant] = useState(0);
-  const [added, setAdded] = useState(false);
+  const [quantity, setQuantity] = useState(1);
 
   const { data: product } = useReadContract({
     address: shopAddress,
@@ -109,9 +118,22 @@ export default function ProductPage() {
     query: { enabled: selectedVariant > 0 },
   });
 
-  if (!product) return <p className="text-zinc-500">Loading...</p>;
+  if (!product) {
+    return (
+      <div className="mx-auto max-w-4xl">
+        <div className="grid gap-8 md:grid-cols-2">
+          <Skeleton className="aspect-square w-full rounded-xl" />
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-3/4" />
+            <Skeleton className="h-6 w-1/3" />
+            <Skeleton className="h-4 w-1/4" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  const [name, price, stock, , , active] = product as [
+  const [name, price, stock, , metadataURI, active] = product as [
     string,
     bigint,
     bigint,
@@ -119,8 +141,21 @@ export default function ProductPage() {
     string,
     boolean
   ];
+  const metadata = useProductMetadata(metadataURI || undefined);
 
-  if (!active) return <p className="text-zinc-500">Product not available</p>;
+  if (!active) {
+    return (
+      <Card className="mx-auto max-w-md">
+        <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+          <Package className="h-8 w-8 text-muted-foreground" />
+          <p className="mt-2 text-muted-foreground">Product not available</p>
+          <Button variant="outline" className="mt-4" asChild>
+            <Link href={`/shop/${shopAddress}`}>Back to shop</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const variantCount = nextVariantId ? Number(nextVariantId) - 1 : 0;
 
@@ -145,48 +180,116 @@ export default function ProductPage() {
       name,
       variantName,
       price: displayPrice,
-      quantity: 1,
+      quantity,
     });
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
+    toast.success("Added to cart", {
+      description: `${quantity}x ${name}${variantName ? ` (${variantName})` : ""}`,
+    });
   };
 
+  const stockNum = Number(displayStock);
+  const stockBadge =
+    stockNum === 0
+      ? { label: "Out of stock", variant: "destructive" as const }
+      : stockNum <= 5
+      ? { label: `Only ${stockNum} left`, variant: "secondary" as const }
+      : { label: "In stock", variant: "secondary" as const };
+
   return (
-    <div className="max-w-2xl">
-      <div className="aspect-square max-w-md rounded-xl bg-zinc-900 border border-zinc-800 mb-6 flex items-center justify-center text-6xl">
-        🛍️
-      </div>
+    <div className="mx-auto max-w-4xl">
+      <div className="grid gap-8 md:grid-cols-2">
+        {/* Product Image */}
+        <Card className="overflow-hidden">
+          <div className="relative flex aspect-square items-center justify-center bg-muted">
+            {metadata?.image ? (
+              <Image
+                src={metadata.image}
+                alt={name}
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 50vw"
+                priority
+              />
+            ) : (
+              <ShoppingBag className="h-20 w-20 text-muted-foreground/30" />
+            )}
+          </div>
+        </Card>
 
-      <h1 className="text-2xl font-bold">{name}</h1>
-      <p className="text-xl text-zinc-300 mt-2">{formatPrice(displayPrice)}</p>
-      <p className="text-sm text-zinc-500 mt-1">
-        {Number(displayStock)} in stock
-      </p>
+        {/* Product Details */}
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold tracking-tight">{name}</h1>
+            <p className="text-2xl font-semibold text-primary">
+              {formatPrice(displayPrice)}
+            </p>
+            <Badge variant={stockBadge.variant}>{stockBadge.label}</Badge>
+          </div>
 
-      {variantCount > 0 && (
-        <div className="mt-4">
-          <p className="text-sm text-zinc-400 mb-2">Variants</p>
-          <VariantSelector
-            shopAddress={shopAddress}
-            productId={productId}
-            variantCount={variantCount}
-            selected={selectedVariant}
-            onSelect={setSelectedVariant}
-          />
+          {metadata?.description && (
+            <p className="text-sm text-muted-foreground">{metadata.description}</p>
+          )}
+
+          <Separator />
+
+          {/* Variants */}
+          {variantCount > 0 && (
+            <div className="space-y-3">
+              <p className="text-sm font-medium">Variant</p>
+              <VariantSelector
+                shopAddress={shopAddress}
+                productId={productId}
+                variantCount={variantCount}
+                selected={selectedVariant}
+                onSelect={setSelectedVariant}
+              />
+            </div>
+          )}
+
+          {/* Quantity */}
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Quantity</p>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                disabled={quantity <= 1}
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <span className="w-8 text-center font-medium">{quantity}</span>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setQuantity(Math.min(stockNum, quantity + 1))}
+                disabled={quantity >= stockNum}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Add to Cart */}
+          <Button
+            size="lg"
+            className="w-full"
+            onClick={handleAdd}
+            disabled={
+              stockNum === 0 || (variantCount > 0 && selectedVariant === 0)
+            }
+          >
+            <ShoppingCart className="h-4 w-4" />
+            {stockNum === 0
+              ? "Out of Stock"
+              : variantCount > 0 && selectedVariant === 0
+              ? "Select a variant"
+              : "Add to Cart"}
+          </Button>
         </div>
-      )}
-
-      <button
-        onClick={handleAdd}
-        disabled={variantCount > 0 && selectedVariant === 0}
-        className="mt-6 rounded-lg bg-blue-600 px-6 py-3 text-sm font-medium text-white hover:bg-blue-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {added
-          ? "✓ Added to Cart"
-          : variantCount > 0 && selectedVariant === 0
-          ? "Select a variant"
-          : "Add to Cart"}
-      </button>
+      </div>
     </div>
   );
 }

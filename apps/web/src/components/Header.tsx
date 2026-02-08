@@ -1,48 +1,28 @@
 "use client";
 
-import Link from "next/link";
-import { ConnectKitButton } from "connectkit";
-import { useEffect, useState } from "react";
-import { getCart } from "@/lib/cart";
+import { usePathname } from "next/navigation";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
+
+function getPageTitle(pathname: string): string {
+  if (pathname === "/") return "Marketplace";
+  if (pathname === "/cart") return "Shopping Cart";
+  if (pathname === "/orders") return "My Orders";
+  if (pathname === "/admin") return "Admin Dashboard";
+  if (pathname.match(/^\/shop\/[^/]+\/product\/\d+$/)) return "Product Details";
+  if (pathname.match(/^\/shop\/[^/]+$/)) return "Shop";
+  return "Onchain Commerce";
+}
 
 export function Header() {
-  const [cartCount, setCartCount] = useState(0);
-
-  useEffect(() => {
-    const update = () => setCartCount(getCart().length);
-    update();
-    window.addEventListener("cart-updated", update);
-    return () => window.removeEventListener("cart-updated", update);
-  }, []);
+  const pathname = usePathname();
+  const title = getPageTitle(pathname);
 
   return (
-    <header className="border-b border-zinc-800 bg-zinc-950">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        <Link href="/" className="text-lg font-bold text-white">
-          ⚡ Onchain Commerce
-        </Link>
-        <nav className="flex items-center gap-4">
-          <Link
-            href="/cart"
-            className="text-sm text-zinc-400 hover:text-white transition"
-          >
-            Cart{cartCount > 0 && ` (${cartCount})`}
-          </Link>
-          <Link
-            href="/orders"
-            className="text-sm text-zinc-400 hover:text-white transition"
-          >
-            Orders
-          </Link>
-          <Link
-            href="/admin"
-            className="text-sm text-zinc-400 hover:text-white transition"
-          >
-            Admin
-          </Link>
-          <ConnectKitButton />
-        </nav>
-      </div>
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+      <SidebarTrigger className="-ml-1" />
+      <Separator orientation="vertical" className="mr-2 h-4" />
+      <h1 className="text-sm font-medium">{title}</h1>
     </header>
   );
 }
