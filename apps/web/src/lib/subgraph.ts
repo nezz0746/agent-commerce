@@ -151,7 +151,7 @@ export async function fetchShops(): Promise<SubgraphShop[]> {
     shops(first: 100, orderBy: createdAt, orderDirection: desc) {
       id address owner name metadataURI paymentSplitAddress agentId createdAt
       products { id }
-      reviews { id rating }
+      reviews(first: 3, orderBy: createdAt, orderDirection: desc) { id rating customer createdAt }
       categories { id }
       collections { id }
       orders { id }

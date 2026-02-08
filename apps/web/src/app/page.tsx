@@ -52,6 +52,28 @@ function ShopCard({ shop }: { shop: SubgraphShop }) {
               </Badge>
             )}
           </div>
+          {shop.reviews && shop.reviews.length > 0 && (
+            <div className="mt-3 space-y-1.5 border-t pt-3">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Recent Reviews</p>
+              {(shop.reviews as SubgraphReview[]).slice(0, 3).map((review) => (
+                <div key={review.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-0.5">
+                    {Array.from({ length: 5 }, (_, i) => (
+                      <Star
+                        key={i}
+                        className={`h-2.5 w-2.5 ${
+                          i < Math.round(review.rating / 20)
+                            ? "fill-yellow-400 text-yellow-400"
+                            : "text-muted-foreground/20"
+                        }`}
+                      />
+                    ))}
+                  </span>
+                  <span className="font-mono">{shortenAddress(review.customer)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </Link>
