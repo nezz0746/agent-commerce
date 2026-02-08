@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
 import { shopAbi, reputationRegistryConfig } from "@/lib/contracts";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,6 +61,7 @@ export function ReviewButton({
   const [open, setOpen] = useState(false);
   const [stars, setStars] = useState(0);
   const { address } = useAccount();
+  const queryClient = useQueryClient();
 
   // Check if already reviewed by reading feedback from reputation registry
   const { data: agentId } = useReadContract({
@@ -86,8 +88,10 @@ export function ReviewButton({
       toast.success("Review submitted!");
       setOpen(false);
       setStars(0);
+      // Invalidate all queries to refetch review data
+      queryClient.invalidateQueries();
     }
-  }, [isSuccess]);
+  }, [isSuccess, queryClient]);
 
   // Only show for Fulfilled (2) or Completed (3) orders
   if (orderStatus !== 2 && orderStatus !== 3) return null;

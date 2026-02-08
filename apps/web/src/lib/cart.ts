@@ -80,6 +80,29 @@ export function removeFromCart(
   window.dispatchEvent(new Event("cart-updated"));
 }
 
+export function updateQuantity(
+  shopAddress: string,
+  productId: bigint,
+  variantId: bigint,
+  quantity: number
+) {
+  const cart = getCart();
+  const item = cart.find(
+    (i) =>
+      i.shopAddress === shopAddress &&
+      i.productId === productId &&
+      i.variantId === variantId
+  );
+  if (item) {
+    if (quantity <= 0) {
+      return removeFromCart(shopAddress, productId, variantId);
+    }
+    item.quantity = quantity;
+    saveCart(cart);
+    window.dispatchEvent(new Event("cart-updated"));
+  }
+}
+
 export function clearCart() {
   if (typeof window === "undefined") return;
   localStorage.removeItem(CART_KEY);
