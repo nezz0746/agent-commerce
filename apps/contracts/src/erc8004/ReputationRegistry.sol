@@ -2,10 +2,15 @@
 pragma solidity ^0.8.24;
 
 import {IdentityRegistry} from "./IdentityRegistry.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+
+interface ICommerceHubForReputation {
+    function isShopAuthorizedForAgent(uint256 agentId, address shop) external view returns (bool);
+}
 
 /// @title ReputationRegistry (ERC-8004)
 /// @notice Feedback system for agents. Clients can give, revoke, and respond to feedback.
-contract ReputationRegistry {
+contract ReputationRegistry is Ownable {
     // ──────────────────────────────────────────────
     //  Types
     // ──────────────────────────────────────────────
@@ -33,6 +38,7 @@ contract ReputationRegistry {
     // ──────────────────────────────────────────────
 
     IdentityRegistry public identityRegistry;
+    ICommerceHubForReputation public commerceHub;
 
     /// @dev agentId → clientAddress → feedbackIndex → Feedback
     mapping(uint256 => mapping(address => mapping(uint64 => Feedback))) private _feedback;
@@ -76,11 +82,15 @@ contract ReputationRegistry {
     //  Constructor / Initialize
     // ──────────────────────────────────────────────
 
-    constructor() {}
+    constructor() Ownable(msg.sender) {}
 
-    function initialize(address identityRegistry_) external {
+    function initialize(address identityRegistry_) external onlyOwner {
         require(address(identityRegistry) == address(0), "Already initialized");
         identityRegistry = IdentityRegistry(identityRegistry_);
+    }
+    
+    function setCommerceHub(address commerceHub_) external onlyOwner {
+        commerceHub = ICommerceHubForReputation(commerceHub_);
     }
 
     // ──────────────────────────────────────────────
@@ -137,7 +147,11 @@ contract ReputationRegistry {
         string calldata responseURI,
         bytes32 responseHash
     ) external {
-        if (!identityRegistry.isOwnerOrApproved(agentId, msg.sender)) revert NotAgentOwner();
+        // Allow either NFT owner/approved OR authorized shop contract to respond
+        bool isNFTOwner = identityRegistry.isOwnerOrApproved(agentId, msg.sender);
+        bool isAuthorizedShop = address(commerceHub) != address(0) && commerceHub.isShopAuthorizedForAgent(agentId, msg.sender);
+        if (!isNFTOwner && !isAuthorizedShop) revert NotAgentOwner();
+        
         if (_feedback[agentId][clientAddress][feedbackIndex].createdAt == 0) revert InvalidFeedbackIndex();
 
         _responses[agentId][clientAddress][feedbackIndex].push(

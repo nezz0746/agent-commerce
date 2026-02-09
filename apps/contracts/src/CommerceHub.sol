@@ -43,6 +43,9 @@ contract CommerceHub is ICommerceHub, Ownable, IERC721Receiver {
 
     /// @notice Shop address → agentId in the identity registry
     mapping(address => uint256) public shopAgentId;
+    
+    /// @notice agentId → authorized shop contract for ERC-8004 responses
+    mapping(uint256 => address) public agentIdToShop;
 
     // ──────────────────────────────────────────────
     //  Events
@@ -117,6 +120,7 @@ contract CommerceHub is ICommerceHub, Ownable, IERC721Receiver {
         // Register the shop as an agent in the identity registry
         uint256 agentId = identityRegistry.register(metadataURI);
         shopAgentId[shop] = agentId;
+        agentIdToShop[agentId] = shop;
 
         // Set ERC-8004 references on the shop
         Shop(payable(shop)).setERC8004(address(reputationRegistry), agentId);
@@ -133,6 +137,11 @@ contract CommerceHub is ICommerceHub, Ownable, IERC721Receiver {
     /// @notice Get the agentId for a shop
     function getShopAgentId(address shop) external view returns (uint256) {
         return shopAgentId[shop];
+    }
+    
+    /// @notice Check if a shop contract is authorized for an agent (for ERC-8004 responses)
+    function isShopAuthorizedForAgent(uint256 agentId, address shop) external view returns (bool) {
+        return agentIdToShop[agentId] == shop;
     }
 
     // ──────────────────────────────────────────────

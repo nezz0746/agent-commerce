@@ -199,6 +199,10 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
     /// @param _metadataURI Shop metadata URI
     /// @param _hub CommerceHub address
     function initialize(address owner, string calldata _name, string calldata _metadataURI, address _hub) external initializer {
+        require(bytes(name).length == 0, "Already initialized");
+        require(owner != address(0), "Invalid owner");
+        require(_hub != address(0), "Invalid hub");
+        
         __AccessControl_init();
         __Pausable_init();
         _reentrancyStatus = _NOT_ENTERED;
@@ -376,11 +380,16 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
             Discount storage d = discounts[discountId];
             if (!d.active) revert InvalidDiscount();
             if (block.timestamp > d.expiresAt) revert DiscountExpired();
-            if (d.usedCount >= d.maxUses) revert DiscountMaxUsed();
-            d.usedCount++;
+            
+            // Atomic increment and check to prevent replay attacks
+            uint256 newUsedCount = d.usedCount + 1;
+            if (newUsedCount > d.maxUses) revert DiscountMaxUsed();
+            d.usedCount = newUsedCount;
+            
             total = total - (total * d.basisPoints / 10000);
         }
 
+        if (total == 0) revert InsufficientPayment(); // Prevent zero value orders
         if (msg.value < total) revert InsufficientPayment();
 
         // Calculate protocol fee
@@ -426,8 +435,9 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
         }
         Order storage o = orders[orderId];
         if (o.status != OrderStatus.Paid) revert InvalidOrderStatus();
+        if (o.escrowAmount == 0) revert InvalidOrderStatus(); // Prevent double release
+        
         o.status = OrderStatus.Fulfilled;
-
         _releaseEscrow(orderId, o);
 
         emit OrderFulfilled(orderId);
@@ -512,9 +522,9 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
             revert AccessControlUnauthorizedAccount(msg.sender, EMPLOYEE_ROLE);
         }
         Order storage o = orders[orderId];
-        if (o.status != OrderStatus.Paid && o.status != OrderStatus.Fulfilled) revert InvalidOrderStatus();
+        if (o.status != OrderStatus.Paid) revert InvalidOrderStatus();
 
-        // Release escrow if still held (status was Paid)
+        // Release escrow only if not already released (only from Paid status)
         if (o.escrowAmount > 0) {
             _releaseEscrow(orderId, o);
         }
@@ -560,6 +570,8 @@ contract Shop is Initializable, AccessControlUpgradeable, PausableUpgradeable {
     /// @notice Add an employee with a specific role
     function addEmployee(address employee, bytes32 role) external onlyRole(OWNER_ROLE) {
         if (employee == address(0)) revert ZeroAddress();
+        // Prevent privilege escalation by restricting role grants
+        if (role == DEFAULT_ADMIN_ROLE || role == OWNER_ROLE) revert AccessControlUnauthorizedAccount(msg.sender, role);
         _grantRole(role, employee);
         emit EmployeeAdded(employee, role);
     }
