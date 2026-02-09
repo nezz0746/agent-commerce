@@ -1,3 +1,5 @@
+![Onchain Commerce Protocol](banner.png)
+
 # Onchain Commerce Protocol
 
 Fully onchain multi-tenant e-commerce protocol on Optimism. Create shops, list products, process orders, collect reviews — all onchain with protocol fees and [0xSplits](https://splits.org) integration.
